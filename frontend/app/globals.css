@@ -2,158 +2,192 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== DESIGN TOKENS ===== */
+/* ============================================================
+   ESSENSHARE DESIGN TOKENS — v1.0
+   Humanitarian editorial register
+   Authored in OKLCH for perceptual uniformity
+   ============================================================ */
 :root {
-  --color-primary:       #2D7A4F;
-  --color-primary-dark:  #1F5C3A;
-  --color-primary-light: #E8F5EE;
-  --color-accent:        #E8913A;
-  --color-accent-dark:   #C97728;
-  --color-neutral-900:   #1A1A1A;
-  --color-neutral-700:   #4A4A4A;
-  --color-neutral-500:   #7A7A7A;
-  --color-neutral-300:   #D4D4D4;
-  --color-neutral-100:   #F5F5F5;
-  --color-white:         #FFFFFF;
-  --color-error:         #D32F2F;
-  --color-success:       #2D7A4F;
-  --color-warning:       #E65100;
-  --color-surface:       #FFFFFF;
-  --color-surface-alt:   #F5F5F5;
-  --color-bg:            #FAFAF7;
-  --color-text:          #1A1A1A;
-  --color-text-muted:    #7A7A7A;
-  --color-border:        #D4D4D4;
+  /* Surfaces — warm off-white, never clinical */
+  --bg:              oklch(97% 0.008 85);
+  --bg-elevated:     oklch(99% 0.004 85);
+  --surface:         oklch(99% 0.004 85);
+  --surface-soft:    oklch(94% 0.010 85);
+  --surface-dark:    oklch(16% 0.012 80);
+  --skeleton:        oklch(92% 0.008 85);
+
+  /* Ink — warm near-black */
+  --ink:             oklch(16% 0.012 80);
+  --ink-muted:       oklch(48% 0.010 80);
+  --ink-quiet:       oklch(62% 0.008 80);
+  --ink-disabled:    oklch(78% 0.006 80);
+  --ink-on-dark:     oklch(96% 0.006 85);
+  --ink-on-dark-muted: oklch(75% 0.008 85);
+
+  /* Accent — ONE colour, forest green, primary actions only */
+  --accent:          oklch(48% 0.130 150);
+  --accent-dark:     oklch(38% 0.120 150);
+  --accent-deeper:   oklch(30% 0.100 150);
+  --accent-muted:    oklch(92% 0.040 150);
+  --accent-on:       oklch(99% 0.004 85);
+
+  /* Borders */
+  --line:            oklch(88% 0.010 80);
+  --line-strong:     oklch(78% 0.012 80);
+  --line-subtle:     oklch(93% 0.008 80);
+
+  /* Semantic states */
+  --success:         oklch(48% 0.130 150);
+  --success-bg:      oklch(95% 0.030 150);
+  --warning:         oklch(58% 0.150 60);
+  --warning-bg:      oklch(96% 0.040 60);
+  --error:           oklch(52% 0.200 25);
+  --error-bg:        oklch(97% 0.030 25);
+  --info:            oklch(52% 0.150 240);
+  --info-bg:         oklch(96% 0.030 240);
+  --focus-ring:      oklch(48% 0.130 150);
+
+  /* Shadows */
+  --shadow-sm:    0 1px 3px oklch(0% 0 0 / 0.08);
+  --shadow-md:    0 4px 16px oklch(0% 0 0 / 0.08), 0 1px 3px oklch(0% 0 0 / 0.04);
+  --shadow-lg:    0 8px 32px oklch(0% 0 0 / 0.10), 0 2px 8px oklch(0% 0 0 / 0.06);
+  --shadow-modal: 0 16px 48px oklch(0% 0 0 / 0.20);
+
+  /* Border radius */
+  --radius-sm:   6px;
+  --radius-md:   12px;
+  --radius-lg:   20px;
+  --radius-pill: 9999px;
+
+  /* Spacing */
+  --space-2xs:  0.25rem;
+  --space-xs:   0.5rem;
+  --space-s:    0.75rem;
+  --space-m:    1rem;
+  --space-l:    1.5rem;
+  --space-xl:   2rem;
+  --space-2xl:  2.5rem;
+  --space-3xl:  4rem;
+  --space-4xl:  6rem;
+  --space-section: clamp(4rem, 8vw, 8rem);
+  --space-page:    clamp(1rem, 4vw, 2.5rem);
+
+  /* Fluid type scale — ratio 1.333, 360px→1600px */
+  --step--1: clamp(0.83rem, 0.79rem + 0.18vw, 0.94rem);
+  --step-0:  clamp(1.00rem, 0.94rem + 0.28vw, 1.19rem);
+  --step-1:  clamp(1.20rem, 1.10rem + 0.45vw, 1.50rem);
+  --step-2:  clamp(1.44rem, 1.28rem + 0.70vw, 1.89rem);
+  --step-3:  clamp(1.73rem, 1.49rem + 1.06vw, 2.38rem);
+  --step-4:  clamp(2.07rem, 1.73rem + 1.55vw, 3.00rem);
+  --display: clamp(2.8rem, 1.4rem + 7vw, 6.5rem);
+
+  /* Motion */
+  --ease-out:   cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in:    cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-inout: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --dur-fast:   0.18s;
+  --dur-base:   0.4s;
+  --dur-slow:   0.9s;
+  --dur-scene:  1.4s;
+
+  /* Grid */
+  --gutter:   clamp(1rem, 0.6rem + 1.6vw, 2.5rem);
+  --page-max: min(100% - var(--gutter) * 2, 1440px);
 }
 
-/* ===== BASE RESET ===== */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* ============================================================ BASE */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  font-optical-sizing: auto;
 }
 
 body {
-  background-color: var(--color-bg);
-  color: var(--color-text);
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: var(--step-0);
   line-height: 1.6;
-  min-height: 100vh;
+  min-block-size: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== SKIP-TO-CONTENT ===== */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.15;
+  text-wrap: balance;
+  letter-spacing: -0.02em;
+}
+
+p { max-inline-size: 68ch; text-wrap: pretty; }
+
+/* ============================================================ ACCESSIBILITY */
 .skip-to-content {
   position: absolute;
-  inset-inline-start: -9999px;
-  top: 1rem;
-  background: var(--color-primary);
-  color: var(--color-white);
-  padding: 0.5rem 1rem;
-  border-radius: 0.25rem;
-  z-index: 9999;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.skip-to-content:focus {
+  inset-block-start: -100%;
   inset-inline-start: 1rem;
+  background: var(--accent);
+  color: var(--accent-on);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: var(--step--1);
+  text-decoration: none;
+  z-index: 9999;
+  transition: inset-block-start var(--dur-fast);
 }
+.skip-to-content:focus { inset-block-start: 1rem; }
 
-/* ===== FOCUS VISIBLE ===== */
 :focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* ============================================================ SKELETON */
+.skeleton {
+  background: linear-gradient(90deg, var(--skeleton) 25%, oklch(96% 0.006 85) 50%, var(--skeleton) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
-/* ===== REDUCED MOTION ===== */
+/* ============================================================ PROSE */
+.prose { max-inline-size: 68ch; }
+.prose h2 { font-size: var(--step-2); margin-block-start: var(--space-3xl); margin-block-end: var(--space-m); letter-spacing: -0.025em; }
+.prose h3 { font-size: var(--step-1); margin-block-start: var(--space-2xl); margin-block-end: var(--space-s); }
+.prose p, .prose li { font-size: var(--step-0); line-height: 1.65; color: var(--ink-muted); margin-block-end: var(--space-m); }
+.prose ul, .prose ol { padding-inline-start: var(--space-l); }
+.prose blockquote { border-inline-start: 3px solid var(--accent); padding-inline-start: var(--space-l); margin-inline: 0; }
+.safety-agreement { border-inline-start: 3px solid var(--accent); background: var(--accent-muted); padding: var(--space-l); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+
+/* ============================================================ REDUCED MOTION */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-/* ===== TYPOGRAPHY ===== */
-h1, h2, h3, h4, h5, h6 {
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--color-text);
+/* ============================================================ LAYOUT */
+.page-container {
+  max-inline-size: 1440px;
+  margin-inline: auto;
+  padding-inline: var(--space-page);
 }
 
-a {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-
-a:hover {
-  color: var(--color-primary-dark);
-}
-
-/* ===== PROSE / POLICY PAGES ===== */
-.prose h2 {
-  font-size: 1.5rem;
-  margin-block-start: 2rem;
-  margin-block-end: 0.75rem;
-  color: var(--color-neutral-900);
-}
-
-.prose h3 {
-  font-size: 1.125rem;
-  margin-block-start: 1.5rem;
-  margin-block-end: 0.5rem;
-  color: var(--color-neutral-700);
-}
-
-.prose p {
-  margin-block-end: 1rem;
-  color: var(--color-neutral-700);
-}
-
-.prose ul, .prose ol {
-  padding-inline-start: 1.5rem;
-  margin-block-end: 1rem;
-}
-
-.prose li {
-  margin-block-end: 0.375rem;
-  color: var(--color-neutral-700);
-}
-
-.prose blockquote {
-  border-inline-start: 4px solid var(--color-primary);
-  padding-inline-start: 1.25rem;
-  margin-inline: 0;
-  color: var(--color-neutral-700);
-  font-style: italic;
-}
-
-/* ===== SAFETY AGREEMENT CALLOUT ===== */
-.safety-agreement {
-  border-inline-start: 4px solid var(--color-primary);
-  background-color: var(--color-primary-light);
-  padding: 1.25rem 1.5rem;
-  border-radius: 0 0.5rem 0.5rem 0;
-}
-
-/* ===== SKELETON LOADING ===== */
-.skeleton {
-  background: linear-gradient(90deg, var(--color-neutral-100) 25%, var(--color-neutral-300) 50%, var(--color-neutral-100) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s infinite;
-  border-radius: 0.375rem;
-}
-
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+/* ============================================================ TRUST POINTS */
+.trust-point:hover {
+  border-inline-start-color: var(--accent);
 }

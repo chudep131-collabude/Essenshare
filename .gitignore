@@ -4,13 +4,11 @@ backend/node_modules/
 
 # Environment files — NEVER commit these
 .env
-.env.local
-.env.staging
-.env.production
+.env.*
+!.env.example
 backend/.env
-backend/.env.local
-backend/.env.staging
-backend/.env.production
+backend/.env.*
+!backend/.env.example
 
 # Logs
 logs/
@@ -28,6 +26,9 @@ Thumbs.db
 dist/
 build/
 .cache/
+
+# Uploads
+uploads/
 
 # Editor
 .vscode/

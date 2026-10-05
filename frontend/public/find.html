@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find Food Near Me — Global Surplus Redistribution Platform</title>
+  <meta name="description" content="Search for surplus food and useful products available near you. No account required. Browse by category and distance." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous" />
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head>
+<body>
+
+  <!-- Skip to main content -->
+  <a class="skip-to-content" href="#main-content">Skip to main content</a>
+
+  <!-- Site Header -->
+  <header class="site-header" role="banner">
+    <div class="site-header__inner">
+      <a class="site-header__logo" href="/">
+        <span aria-hidden="true">🌱</span>
+        <span>SurplusShare</span>
+      </a>
+
+      <button
+        class="site-header__menu-toggle"
+        id="menu-toggle"
+        aria-controls="site-nav"
+        aria-expanded="false"
+        aria-label="Open navigation menu"
+        type="button"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+
+      <nav aria-label="Main navigation">
+        <ul class="site-header__nav" id="site-nav" role="list">
+          <li><a class="nav-link" href="/find.html">Find Food</a></li>
+          <li><a class="nav-link" href="/register.html">Donate</a></li>
+          <li><a class="nav-link" href="/about.html">About</a></li>
+          <li><a class="nav-link" href="/safety.html">Safety</a></li>
+          <li><a class="nav-link" href="/impact.html">Impact</a></li>
+          <li><a class="btn-primary" href="/login.html" style="margin-inline-start:0.5rem;padding-block:0.4rem;padding-inline:1rem;">Login</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main-content">
+    <div class="main-content">
+
+      <h1 style="font-size:1.875rem;font-weight:800;color:var(--color-text);margin-block-end:0.375rem;">Find Food Near You</h1>
+      <p style="color:var(--color-text-muted);margin-block-end:2rem;">No account required. Browse surplus food and useful products available nearby.</p>
+
+      <!-- Search & Filter Bar -->
+      <section aria-labelledby="search-heading">
+        <h2 id="search-heading" class="sr-only">Search and filter donations</h2>
+
+        <div style="background-color:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding-block:1.5rem;padding-inline:1.5rem;margin-block-end:1.5rem;box-shadow:var(--shadow-sm);">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end;margin-block-end:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" for="location-input">Your location</label>
+              <input
+                class="form-control"
+                type="text"
+                id="location-input"
+                name="location"
+                placeholder="Enter your street, suburb, or postcode…"
+                autocomplete="street-address"
+                aria-describedby="location-hint"
+              />
+              <p class="form-hint" id="location-hint">Your location is not stored — used only to find nearby donations.</p>
+            </div>
+            <button
+              class="btn-secondary"
+              id="use-location-btn"
+              type="button"
+              aria-label="Use my current location"
+              style="white-space:nowrap;align-self:flex-start;margin-block-start:1.625rem;"
+            >
+              📍 Use My Location
+            </button>
+          </div>
+
+          <div id="location-error" class="alert alert--error" role="alert" aria-live="polite" style="display:none;"></div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;">
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" for="category-filter">Category</label>
+              <select class="form-control" id="category-filter" name="category">
+                <option value="">All categories</option>
+                <optgroup label="Food &amp; Beverages">
+                  <option value="prepared-meals">Prepared meals</option>
+                  <option value="baked-goods">Baked goods</option>
+                  <option value="fresh-produce">Fresh produce</option>
+                  <option value="packaged-nonperishable">Packaged / non-perishable</option>
+                  <option value="dairy">Dairy</option>
+                  <option value="meat-fish">Meat / fish</option>
+                  <option value="beverages">Beverages</option>
+                  <option value="baby-food">Baby food / infant formula</option>
+                </optgroup>
+                <optgroup label="Household &amp; Consumer">
+                  <option value="hygiene">Personal hygiene products</option>
+                  <option value="cleaning">Cleaning supplies</option>
+                  <option value="baby-supplies">Baby / infant supplies</option>
+                  <option value="clothing">Clothing</option>
+                  <option value="household">Household items</option>
+                </optgroup>
+                <optgroup label="Agricultural">
+                  <option value="farm-surplus">Farm surplus produce</option>
+                  <option value="seeds">Seeds</option>
+                </optgroup>
+                <optgroup label="Emergency">
+                  <option value="emergency-rations">Emergency rations</option>
+                  <option value="water">Water</option>
+                </optgroup>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin:0;">
+              <label class="form-label" for="distance-filter">Distance</label>
+              <select class="form-control" id="distance-filter" name="distance">
+                <option value="5">Within 5 km</option>
+                <option value="1">Within 1 km</option>
+                <option value="10">Within 10 km</option>
+                <option value="25">Within 25 km</option>
+                <option value="50">Within 50 km</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin:0;display:flex;align-items:flex-end;">
+              <button class="btn-primary" type="button" id="search-btn" style="inline-size:100%;">
+                Search
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Map Container -->
+      <section aria-labelledby="map-heading">
+        <h2 id="map-heading" style="font-size:1.125rem;font-weight:700;color:var(--color-text);margin-block-end:0.75rem;">Donations Map</h2>
+        <div
+          id="map"
+          data-tile-url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          role="application"
+          aria-label="Interactive map showing nearby donation locations"
+        ></div>
+        <p style="font-size:0.8125rem;color:var(--color-text-muted);margin-block-start:0.5rem;">
+          Map data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
+        </p>
+      </section>
+
+      <!-- Results List -->
+      <section aria-labelledby="results-heading" style="margin-block-start:2rem;">
+        <h2 id="results-heading" style="font-size:1.125rem;font-weight:700;color:var(--color-text);margin-block-end:0.75rem;">
+          Available Donations
+          <span id="results-count" style="font-size:0.875rem;font-weight:400;color:var(--color-text-muted);margin-inline-start:0.5rem;"></span>
+        </h2>
+
+        <div id="results-list" aria-live="polite" aria-atomic="false">
+          <div class="card" style="text-align:center;padding-block:3rem;">
+            <div style="font-size:2.5rem;margin-block-end:0.75rem;" aria-hidden="true">🔍</div>
+            <p style="color:var(--color-text-muted);margin:0;">
+              Enter your location or click <strong>Use My Location</strong> to find donations nearby.
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="site-footer__inner">
+      <ul class="site-footer__links" role="list">
+        <li><a href="/">Home</a></li>
+        <li><a href="/find.html">Find Food</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/safety.html">Safety Policy</a></li>
+        <li><a href="/privacy.html">Privacy Policy</a></li>
+        <li><a href="/impact.html">Impact</a></li>
+        <li><a href="/login.html">Donor Login</a></li>
+        <li><a href="/register.html">Register</a></li>
+      </ul>
+      <p class="site-footer__copy">
+        &copy; Global Surplus Redistribution Platform. No account required to receive.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Cookie Notice -->
+  <div class="cookie-notice is-hidden" id="cookie-notice" role="region" aria-label="Cookie information">
+    <p class="cookie-notice__text">
+      This site uses functional cookies only. <a href="/privacy.html" style="color:rgba(255,255,255,0.8);text-decoration:underline;">Learn more</a>
+    </p>
+    <button class="cookie-notice__dismiss" id="cookie-dismiss" type="button">Got it</button>
+  </div>
+
+  <!-- Leaflet JS CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin="anonymous"></script>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/map.js"></script>
+  <script>
+    // Initialise map on page load
+    document.addEventListener('DOMContentLoaded', function () {
+      var map = initMap('map', { center: [20, 0], zoom: 2 });
+
+      // Use My Location button
+      var locationBtn = document.getElementById('use-location-btn');
+      var locationError = document.getElementById('location-error');
+
+      if (locationBtn) {
+        locationBtn.addEventListener('click', function () {
+          locationBtn.disabled = true;
+          locationBtn.textContent = 'Getting location…';
+          locationError.style.display = 'none';
+
+          getUserLocation()
+            .then(function (coords) {
+              locationBtn.disabled = false;
+              locationBtn.textContent = '📍 Use My Location';
+              if (map) {
+                map.setView([coords.lat, coords.lng], 13);
+              }
+              document.getElementById('location-input').value = coords.lat.toFixed(5) + ', ' + coords.lng.toFixed(5);
+            })
+            .catch(function (err) {
+              locationBtn.disabled = false;
+              locationBtn.textContent = '📍 Use My Location';
+              locationError.style.display = '';
+              locationError.textContent = err.message;
+            });
+        });
+      }
+    });
+  </script>
+  <script src="/assets/js/main.js"></script>
+</body>
+</html>

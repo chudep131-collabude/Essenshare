@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Impact Dashboard — Global Surplus Redistribution Platform</title>
+  <meta name="description" content="Real-world impact data from confirmed surplus food donations. Every number represents a completed transaction." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head>
+<body>
+
+  <!-- Skip to main content -->
+  <a class="skip-to-content" href="#main-content">Skip to main content</a>
+
+  <!-- Site Header -->
+  <header class="site-header" role="banner">
+    <div class="site-header__inner">
+      <a class="site-header__logo" href="/">
+        <span aria-hidden="true">🌱</span>
+        <span>SurplusShare</span>
+      </a>
+
+      <button
+        class="site-header__menu-toggle"
+        id="menu-toggle"
+        aria-controls="site-nav"
+        aria-expanded="false"
+        aria-label="Open navigation menu"
+        type="button"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+
+      <nav aria-label="Main navigation">
+        <ul class="site-header__nav" id="site-nav" role="list">
+          <li><a class="nav-link" href="/find.html">Find Food</a></li>
+          <li><a class="nav-link" href="/register.html">Donate</a></li>
+          <li><a class="nav-link" href="/about.html">About</a></li>
+          <li><a class="nav-link" href="/safety.html">Safety</a></li>
+          <li><a class="nav-link" href="/impact.html">Impact</a></li>
+          <li><a class="btn-primary" href="/login.html" style="margin-inline-start:0.5rem;padding-block:0.4rem;padding-inline:1rem;">Login</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main-content">
+    <div class="main-content">
+
+      <header style="margin-block-end:2.5rem;">
+        <h1 style="font-size:2rem;font-weight:800;color:var(--color-text);margin-block-end:0.5rem;">Real Impact, Real Numbers</h1>
+        <p style="color:var(--color-text-muted);font-size:1.0625rem;max-inline-size:600px;margin-block-end:0.75rem;">
+          Every number below comes from a confirmed, completed pickup. No estimates, no projections.
+        </p>
+        <div id="impact-status" role="status" aria-live="polite" style="font-size:0.875rem;color:var(--color-text-muted);"></div>
+      </header>
+
+      <!-- Stat Grid -->
+      <section aria-labelledby="stats-heading">
+        <h2 id="stats-heading" style="font-size:1.25rem;font-weight:700;color:var(--color-text);margin-block-end:1.25rem;">Platform Statistics</h2>
+
+        <div class="stat-grid" id="impact-grid">
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-total-donations" aria-label="Total donations">—</div>
+            <div class="stat-card__label">Total Donations</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-meals" aria-label="Meals redistributed">—</div>
+            <div class="stat-card__label">Meals Redistributed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-recipients" aria-label="Recipients served">—</div>
+            <div class="stat-card__label">Recipients Served</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-donors" aria-label="Active donors">—</div>
+            <div class="stat-card__label">Active Donors</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-organisations" aria-label="Partner organisations">—</div>
+            <div class="stat-card__label">Partner Organisations</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-kg" aria-label="Kilograms of food saved">—</div>
+            <div class="stat-card__label">kg Food Saved</div>
+          </div>
+        </div>
+
+        <p style="font-size:0.8125rem;color:var(--color-text-muted);margin-block-start:1rem;text-align:center;">
+          Powered by completed transactions only (Platform Principle #17). Stats update in real time.
+        </p>
+      </section>
+
+      <!-- Map Placeholder -->
+      <section aria-labelledby="map-section-heading" style="margin-block-start:3rem;">
+        <h2 id="map-section-heading" style="font-size:1.25rem;font-weight:700;color:var(--color-text);margin-block-end:1rem;">Impact Map</h2>
+        <div class="card" style="text-align:center;padding-block:3rem;background-color:var(--color-surface-alt);">
+          <div style="font-size:2.5rem;margin-block-end:0.75rem;" aria-hidden="true">🗺️</div>
+          <p style="color:var(--color-text-muted);margin:0;font-size:1rem;">
+            Interactive impact map coming in <strong>Phase 9</strong>.
+          </p>
+          <p style="color:var(--color-text-muted);font-size:0.875rem;margin-block-start:0.5rem;margin-block-end:0;">
+            Will show a heatmap of completed pickups worldwide.
+          </p>
+        </div>
+      </section>
+
+      <!-- Data Source Note -->
+      <section aria-labelledby="data-source-heading" style="margin-block-start:3rem;">
+        <h2 id="data-source-heading" style="font-size:1.125rem;font-weight:700;color:var(--color-text);margin-block-end:0.75rem;">About This Data</h2>
+        <div class="card" style="border-inline-start:4px solid var(--color-primary);">
+          <p style="color:var(--color-text-muted);margin:0;font-size:0.9375rem;line-height:1.7;">
+            <strong>Platform Principle #17:</strong> Impact statistics come only from confirmed completed transactions.
+            A transaction is complete when the donor has confirmed the actual items and quantities handed over.
+            Requested pickups that were never collected, cancelled transactions, or expired listings are excluded entirely.
+            This makes the numbers conservative — and trustworthy.
+          </p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="site-footer__inner">
+      <ul class="site-footer__links" role="list">
+        <li><a href="/">Home</a></li>
+        <li><a href="/find.html">Find Food</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/safety.html">Safety Policy</a></li>
+        <li><a href="/privacy.html">Privacy Policy</a></li>
+        <li><a href="/impact.html">Impact</a></li>
+        <li><a href="/login.html">Donor Login</a></li>
+        <li><a href="/register.html">Register</a></li>
+      </ul>
+      <p class="site-footer__copy">
+        &copy; Global Surplus Redistribution Platform. Real impact, honest numbers.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Cookie Notice -->
+  <div class="cookie-notice is-hidden" id="cookie-notice" role="region" aria-label="Cookie information">
+    <p class="cookie-notice__text">
+      This site uses functional cookies only. <a href="/privacy.html" style="color:rgba(255,255,255,0.8);text-decoration:underline;">Learn more</a>
+    </p>
+    <button class="cookie-notice__dismiss" id="cookie-dismiss" type="button">Got it</button>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    // Load impact summary stats from API
+    document.addEventListener('DOMContentLoaded', function () {
+      var statusEl = document.getElementById('impact-status');
+
+      function formatNumber(n) {
+        if (n === null || n === undefined) return '—';
+        return Number(n).toLocaleString();
+      }
+
+      api.get('/impact/summary')
+        .then(function (data) {
+          var stats = data.data || data;
+
+          var mapping = {
+            'stat-total-donations': stats.total_donations,
+            'stat-meals':           stats.meals_redistributed,
+            'stat-recipients':      stats.recipients_served,
+            'stat-donors':          stats.active_donors,
+            'stat-organisations':   stats.partner_organisations,
+            'stat-kg':              stats.kg_food_saved,
+          };
+
+          Object.keys(mapping).forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = formatNumber(mapping[id]);
+          });
+
+          statusEl.textContent = 'Stats last updated: ' + new Date().toLocaleTimeString();
+        })
+        .catch(function (err) {
+          // API not available yet (Phase 2+ required for real data)
+          statusEl.textContent = 'Stats unavailable — database not yet connected (Phase 2).';
+        });
+    });
+  </script>
+  <script src="/assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Food Safety Policy — Global Surplus Redistribution Platform</title>
+  <meta name="description" content="Read the Donor Safety Agreement, prohibited items, cold chain guidance, and report an unsafe donation. Food safety is non-negotiable." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/assets/css/main.css" />
+</head>
+<body>
+
+  <!-- Skip to main content -->
+  <a class="skip-to-content" href="#main-content">Skip to main content</a>
+
+  <!-- Site Header -->
+  <header class="site-header" role="banner">
+    <div class="site-header__inner">
+      <a class="site-header__logo" href="/">
+        <span aria-hidden="true">🌱</span>
+        <span>SurplusShare</span>
+      </a>
+
+      <button
+        class="site-header__menu-toggle"
+        id="menu-toggle"
+        aria-controls="site-nav"
+        aria-expanded="false"
+        aria-label="Open navigation menu"
+        type="button"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+
+      <nav aria-label="Main navigation">
+        <ul class="site-header__nav" id="site-nav" role="list">
+          <li><a class="nav-link" href="/find.html">Find Food</a></li>
+          <li><a class="nav-link" href="/register.html">Donate</a></li>
+          <li><a class="nav-link" href="/about.html">About</a></li>
+          <li><a class="nav-link" href="/safety.html">Safety</a></li>
+          <li><a class="nav-link" href="/impact.html">Impact</a></li>
+          <li><a class="btn-primary" href="/login.html" style="margin-inline-start:0.5rem;padding-block:0.4rem;padding-inline:1rem;">Login</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main id="main-content">
+    <div class="main-content prose">
+
+      <header style="margin-block-end:2.5rem;">
+        <h1 style="font-size:2rem;font-weight:800;color:var(--color-text);margin-block-end:0.75rem;">Food Safety Policy</h1>
+        <p style="font-size:1.0625rem;color:var(--color-text-muted);max-inline-size:680px;">
+          Food safety is non-negotiable. This policy explains what donors must agree to, what is prohibited, how to report concerns, and how we protect recipients.
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-block-start:1rem;">
+          <a href="#donor-agreement" class="badge badge--primary">Donor Agreement</a>
+          <a href="#prohibited" class="badge">Prohibited Items</a>
+          <a href="#cold-chain" class="badge">Cold Chain</a>
+          <a href="#report-form" class="badge">Report a Safety Concern</a>
+        </div>
+      </header>
+
+      <!-- Donor Safety Agreement -->
+      <section aria-labelledby="donor-agreement-heading">
+        <h2 id="donor-agreement">Donor Safety Agreement</h2>
+        <p>
+          Every donor must accept the following agreement before they can post any donation. The agreement is shown in full at onboarding and the timestamp, version, and user ID are recorded.
+        </p>
+
+        <blockquote class="safety-agreement">
+          <p style="font-weight:700;margin-block-end:1rem;">Donor Safety Agreement v1.0</p>
+          <p style="margin-block-end:0.75rem;">I confirm that:</p>
+          <ol>
+            <li>The items I am donating are safe, fit for their intended use, and suitable for distribution to members of the public.</li>
+            <li>I will not knowingly distribute food or products that are spoiled, contaminated, improperly stored, past their use-by date, subject to a recall, or otherwise unsafe or prohibited from distribution.</li>
+            <li>The information I provide about my donation — including descriptions, quantities, allergens, storage requirements, and use-by dates — is accurate to the best of my knowledge.</li>
+            <li>I understand that recipients may include people with dietary needs, allergies, or medical conditions, and I take that responsibility seriously.</li>
+            <li>I accept that the platform is a facilitator and not responsible for the safety of food or products I list. I bear sole responsibility for items I choose to distribute.</li>
+            <li>I understand that deliberately providing false or misleading safety information may result in my account being suspended or permanently banned, and may have legal consequences.</li>
+            <li>I will remove or update my listing immediately if I become aware that any item may be unsafe.</li>
+          </ol>
+        </blockquote>
+      </section>
+
+      <!-- Prohibited Items -->
+      <section aria-labelledby="prohibited-heading">
+        <h2 id="prohibited">What the Platform Prohibits</h2>
+        <p>Donors may <strong>never</strong> list the following:</p>
+        <ul>
+          <li>Food that the donor knows or suspects is unsafe or spoiled</li>
+          <li>Food subject to an active product recall</li>
+          <li>Medications of any kind (prescription or over-the-counter)</li>
+          <li>Alcohol (may be restricted by local law — configurable per region)</li>
+          <li>Unpackaged raw meat or fish that cannot be maintained at safe temperatures until pickup</li>
+          <li>Infant formula that has been opened or is past its use-by date</li>
+          <li>Any substance that is illegal in the jurisdiction of distribution</li>
+          <li>Products with intentionally misleading descriptions</li>
+        </ul>
+        <p>
+          If a listing is found to violate these prohibitions, it is removed immediately and the donor account is flagged for review.
+        </p>
+      </section>
+
+      <!-- Cold Chain Guidance -->
+      <section aria-labelledby="cold-chain-heading">
+        <h2 id="cold-chain">Cold Chain Guidance</h2>
+
+        <h3>Refrigerated items (2–8°C)</h3>
+        <ul>
+          <li>Must remain refrigerated until shortly before pickup.</li>
+          <li>Pickup window should be maximum 2 hours after removal from refrigeration (unless the donor can provide refrigeration at the pickup point).</li>
+          <li>The listing must specify that pickup must occur within a donor-defined timeframe after collection.</li>
+        </ul>
+
+        <h3>Frozen items</h3>
+        <ul>
+          <li>Must remain frozen until the donor confirms readiness for pickup.</li>
+          <li>The donor must note whether items can be collected frozen (recipient is then responsible for transport).</li>
+          <li>Donors must <strong>not</strong> refreeze thawed items.</li>
+        </ul>
+      </section>
+
+      <!-- Report Form -->
+      <section aria-labelledby="report-heading">
+        <h2 id="report-form">Report an Unsafe Donation</h2>
+        <p>
+          Anyone — recipient, donor, or visitor — can report a safety concern. No account is required.
+          Reports are reviewed promptly. Your identity is not shared with the donor.
+        </p>
+
+        <div class="card" style="max-inline-size:600px;">
+          <form id="safety-report-form" novalidate>
+
+            <fieldset style="border:none;padding:0;margin:0;">
+              <legend style="font-size:1.125rem;font-weight:700;color:var(--color-text);margin-block-end:1.25rem;">Safety Report Form</legend>
+
+              <!-- Report Category -->
+              <div class="form-group">
+                <label class="form-label" for="report-category">
+                  Report category <span class="required" aria-hidden="true">*</span>
+                </label>
+                <select
+                  class="form-control"
+                  id="report-category"
+                  name="category"
+                  required
+                  aria-required="true"
+                  aria-describedby="report-category-error"
+                >
+                  <option value="">Select a category…</option>
+                  <option value="UNSAFE_FOOD">Unsafe food — donor knowingly listed unsafe food, or recipient became ill</option>
+                  <option value="SPOILED_OR_EXPIRED">Spoiled or expired — food appears spoiled, mouldy, or past use-by date</option>
+                  <option value="WRONG_ALLERGEN_INFO">Wrong allergen information — allergens are incorrect or missing</option>
+                  <option value="WRONG_DESCRIPTION">Wrong description — items don't match the listing</option>
+                  <option value="COLD_CHAIN_CONCERN">Cold chain concern — refrigerated/frozen item not stored correctly</option>
+                  <option value="ALREADY_GONE">Already gone — donation was gone when I arrived</option>
+                </select>
+                <span class="form-error" id="report-category-error" role="alert" aria-live="polite"></span>
+              </div>
+
+              <!-- Listing ID (optional) -->
+              <div class="form-group">
+                <label class="form-label" for="listing-id">
+                  Listing reference number
+                  <span style="font-weight:400;color:var(--color-text-muted);"> (optional)</span>
+                </label>
+                <input
+                  class="form-control"
+                  type="text"
+                  id="listing-id"
+                  name="listing_id"
+                  placeholder="e.g. DON-12345 (shown on the listing page)"
+                  autocomplete="off"
+                />
+                <p class="form-hint">If you know the listing ID, include it to help us locate the listing faster.</p>
+              </div>
+
+              <!-- Description -->
+              <div class="form-group">
+                <label class="form-label" for="report-description">
+                  Description
+                  <span style="font-weight:400;color:var(--color-text-muted);"> (optional — max 500 characters)</span>
+                </label>
+                <textarea
+                  class="form-control"
+                  id="report-description"
+                  name="description"
+                  rows="4"
+                  maxlength="500"
+                  placeholder="Describe what you observed. Do not include personal contact details."
+                  aria-describedby="report-description-hint"
+                ></textarea>
+                <p class="form-hint" id="report-description-hint">Do not include your name, phone number, or email in this field — your identity is protected.</p>
+              </div>
+
+              <!-- Submit feedback area -->
+              <div id="report-feedback" role="alert" aria-live="polite" style="margin-block-end:1rem;"></div>
+
+              <button class="btn-primary" type="submit" id="report-submit-btn" style="inline-size:100%;">
+                Submit Safety Report
+              </button>
+
+              <p style="font-size:0.8125rem;color:var(--color-text-muted);margin-block-start:0.75rem;text-align:center;">
+                Reports are anonymous. You will not receive updates on the review outcome to protect donors from targeted harassment.
+              </p>
+            </fieldset>
+          </form>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="site-footer__inner">
+      <ul class="site-footer__links" role="list">
+        <li><a href="/">Home</a></li>
+        <li><a href="/find.html">Find Food</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/safety.html">Safety Policy</a></li>
+        <li><a href="/privacy.html">Privacy Policy</a></li>
+        <li><a href="/impact.html">Impact</a></li>
+        <li><a href="/login.html">Donor Login</a></li>
+        <li><a href="/register.html">Register</a></li>
+      </ul>
+      <p class="site-footer__copy">
+        &copy; Global Surplus Redistribution Platform. Food safety is non-negotiable.
+      </p>
+    </div>
+  </footer>
+
+  <!-- Cookie Notice -->
+  <div class="cookie-notice is-hidden" id="cookie-notice" role="region" aria-label="Cookie information">
+    <p class="cookie-notice__text">
+      This site uses functional cookies only. <a href="/privacy.html" style="color:rgba(255,255,255,0.8);text-decoration:underline;">Learn more</a>
+    </p>
+    <button class="cookie-notice__dismiss" id="cookie-dismiss" type="button">Got it</button>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    // Safety report form submission
+    document.getElementById('safety-report-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      var form     = e.target;
+      var category = form.elements['category'].value;
+      var feedback = document.getElementById('report-feedback');
+      var submitBtn = document.getElementById('report-submit-btn');
+      var categoryError = document.getElementById('report-category-error');
+
+      // Client-side validation
+      categoryError.textContent = '';
+      if (!category) {
+        categoryError.textContent = 'Please select a report category.';
+        form.elements['category'].focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+      feedback.innerHTML = '';
+
+      var body = {
+        category: category,
+        listing_id: form.elements['listing_id'].value.trim() || null,
+        description: form.elements['description'].value.trim() || null,
+      };
+
+      api.post('/reports', body)
+        .then(function () {
+          feedback.innerHTML = '<div class="alert alert--success">Thank you. Your report has been submitted and will be reviewed promptly.</div>';
+          form.reset();
+        })
+        .catch(function (err) {
+          // Non-401 errors shown to user; passwords never involved here
+          feedback.innerHTML = '<div class="alert alert--error">There was a problem submitting your report. Please try again. If the issue continues, contact us directly.</div>';
+        })
+        .finally(function () {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Safety Report';
+        });
+    });
+  </script>
+  <script src="/assets/js/main.js"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'dark';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps {
@@ -16,19 +16,21 @@ interface ButtonProps {
   'aria-label'?: string;
 }
 
-const variantClasses: Record<ButtonVariant, string> = {
+const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary text-white hover:bg-primary-dark focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 border border-transparent',
+    'bg-accent text-[var(--accent-on)] hover:bg-accent-dark border-transparent',
   secondary:
-    'bg-transparent text-primary border border-primary hover:bg-primary-light focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+    'bg-surface-soft text-ink hover:bg-line border-transparent',
   ghost:
-    'bg-transparent text-text-base hover:bg-neutral-100 border border-transparent focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+    'bg-transparent text-ink-muted border-line hover:bg-surface-soft',
+  dark:
+    'bg-[var(--surface-dark)] text-[var(--ink-on-dark)] border-transparent hover:bg-[oklch(22%_0.012_80)]',
 };
 
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-5 py-2.5 text-sm',
-  lg: 'px-7 py-3 text-base',
+const sizeStyles: Record<ButtonSize, string> = {
+  sm: 'text-[length:var(--step--1)] px-m min-h-[36px]',
+  md: 'text-[length:var(--step-0)] px-xl min-h-[44px]',
+  lg: 'text-[length:var(--step-1)] px-2xl min-h-[52px]',
 };
 
 export default function Button({
@@ -36,21 +38,17 @@ export default function Button({
   size = 'md',
   href,
   onClick,
-  disabled = false,
+  disabled,
   children,
   className,
   type = 'button',
   'aria-label': ariaLabel,
 }: ButtonProps) {
-  const classes = cn(
-    'inline-flex items-center justify-center rounded-lg font-semibold transition-colors duration-150 cursor-pointer',
-    variantClasses[variant],
-    sizeClasses[size],
-    disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
-    className
-  );
+  const base =
+    'inline-flex items-center justify-center font-semibold rounded-pill border transition-all duration-[var(--dur-fast)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-3 disabled:opacity-50 disabled:pointer-events-none';
+  const classes = cn(base, variantStyles[variant], sizeStyles[size], className);
 
-  if (href && !disabled) {
+  if (href) {
     return (
       <Link href={href} className={classes} aria-label={ariaLabel}>
         {children}

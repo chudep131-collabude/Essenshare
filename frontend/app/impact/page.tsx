@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import ImpactStats from '@/components/home/ImpactStats';
 
+// Dynamic rendering — ImpactStats fetches live data from the API
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Impact Dashboard',
   description:

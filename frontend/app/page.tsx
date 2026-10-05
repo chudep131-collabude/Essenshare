@@ -5,6 +5,9 @@ import ImpactStats from '@/components/home/ImpactStats';
 import HowItWorks from '@/components/home/HowItWorks';
 import DonorCTA from '@/components/home/DonorCTA';
 
+// ImpactStats fetches live data — avoid SSG timeout
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Home',
   description:

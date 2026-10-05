@@ -191,3 +191,13 @@ p { max-inline-size: 68ch; text-wrap: pretty; }
 .trust-point:hover {
   border-inline-start-color: var(--accent);
 }
+
+/* ============================================================ FOOTER */
+.footer-link {
+  color: var(--ink-on-dark-muted);
+  transition: color var(--dur-fast) var(--ease-out);
+  text-decoration: none;
+}
+.footer-link:hover {
+  color: var(--ink-on-dark);
+}

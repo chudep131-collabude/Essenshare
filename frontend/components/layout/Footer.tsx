@@ -57,10 +57,7 @@ export default function Footer() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="text-[var(--step--1)] transition-colors duration-[var(--dur-fast)]"
-                    style={{ color: 'var(--ink-on-dark-muted)' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--ink-on-dark)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-on-dark-muted)')}
+                    className="footer-link text-[var(--step--1)]"
                   >
                     {label}
                   </Link>
@@ -82,10 +79,7 @@ export default function Footer() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="text-[var(--step--1)] transition-colors duration-[var(--dur-fast)]"
-                    style={{ color: 'var(--ink-on-dark-muted)' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--ink-on-dark)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-on-dark-muted)')}
+                    className="footer-link text-[var(--step--1)]"
                   >
                     {label}
                   </Link>
@@ -107,10 +101,7 @@ export default function Footer() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="text-[var(--step--1)] transition-colors duration-[var(--dur-fast)]"
-                    style={{ color: 'var(--ink-on-dark-muted)' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--ink-on-dark)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-on-dark-muted)')}
+                    className="footer-link text-[var(--step--1)]"
                   >
                     {label}
                   </Link>
@@ -128,7 +119,7 @@ export default function Footer() {
             &copy; Essenshare. Free, nonprofit-operated. Built with dignity.{' '}
             <Link
               href="/privacy"
-              className="underline hover:text-[var(--ink-on-dark-muted)] transition-colors duration-[var(--dur-fast)]"
+              className="footer-link underline"
             >
               Privacy Policy
             </Link>

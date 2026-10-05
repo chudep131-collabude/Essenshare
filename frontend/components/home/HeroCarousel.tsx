@@ -4,10 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import gsap from 'gsap';
-import { SplitText } from 'gsap/SplitText';
-
-// Register once at module level — safe for SSR (Next.js runs this on client via 'use client')
-gsap.registerPlugin(SplitText);
 
 interface Slide {
   src: string;
@@ -65,23 +61,20 @@ export default function HeroCarousel() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // GSAP SplitText line-mask reveal — fires once on first mount
+  // GSAP headline reveal — fires once on first mount
+  // Uses clipPath + translateY instead of Club-only SplitText
   useEffect(() => {
     if (reducedMotion || hasRevealedRef.current || !headlineRef.current) return;
     hasRevealedRef.current = true;
 
     const ctx = gsap.context(() => {
-      const split = new SplitText(headlineRef.current!, {
-        type: 'lines',
-        mask: 'lines',
-      });
-      gsap.from(split.lines, {
-        yPercent: 110,
+      gsap.from(headlineRef.current!, {
+        clipPath: 'inset(0 0 100% 0)',
+        y: 32,
         duration: 1.1,
         ease: 'power4.out',
-        stagger: 0.09,
         delay: 0.3,
-        onComplete: () => split.revert(),
+        clearProps: 'clipPath,y',
       });
     }, headlineRef);
 

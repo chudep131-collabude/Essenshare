@@ -93,7 +93,7 @@ export default function HeroCarousel() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Slides */}
+      {/* Slides — all use next/image for WebP/AVIF optimization and responsive srcset */}
       {slides.map((slide, idx) => (
         <div
           key={slide.src}
@@ -101,26 +101,17 @@ export default function HeroCarousel() {
           aria-label={slide.alt}
           aria-hidden={idx !== current}
           className="absolute inset-0 transition-opacity duration-700"
-          style={{
-            opacity: idx === current ? 1 : 0,
-            backgroundImage: `url(${slide.src})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-          }}
+          style={{ opacity: idx === current ? 1 : 0 }}
         >
-          {/* Preload first slide image via next/image for LCP */}
-          {idx === 0 && (
-            <Image
-              src={slide.src}
-              alt=""
-              fill
-              priority
-              className="object-cover"
-              aria-hidden="true"
-              sizes="100vw"
-            />
-          )}
+          <Image
+            src={slide.src}
+            alt={slide.alt}
+            fill
+            priority={idx === 0}
+            className="object-cover object-center"
+            sizes="100vw"
+            aria-hidden="true"
+          />
         </div>
       ))}
 
@@ -151,7 +142,7 @@ export default function HeroCarousel() {
         </div>
       </div>
 
-      {/* Prev/Next arrows — hidden on mobile */}
+      {/* Prev/Next arrows — hidden on mobile (logical CSS: inset-inline-start / inset-inline-end) */}
       <button
         type="button"
         onClick={prev}

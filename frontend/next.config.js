@@ -1,4 +1,16 @@
 /** @type {import('next').NextConfig} */
+
+// Derive API origin from NEXT_PUBLIC_API_URL so CSP works in all environments.
+// Falls back to localhost only when the env var is absent (local dev without .env.local).
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+let apiOrigin;
+try {
+  apiOrigin = new URL(apiUrl).origin;
+} catch {
+  // Malformed URL — fall back safely
+  apiOrigin = 'http://localhost:3001';
+}
+
 const nextConfig = {
   images: {
     unoptimized: false,
@@ -25,7 +37,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' http://localhost:3001/api/v1",
+              `connect-src 'self' ${apiOrigin}`,
               "frame-ancestors 'none'",
             ].join('; '),
           },

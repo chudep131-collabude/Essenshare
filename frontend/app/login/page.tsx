@@ -1,6 +1,5 @@
 'use client';
 
-import type { Metadata } from 'next';
 import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import Alert from '@/components/ui/Alert';

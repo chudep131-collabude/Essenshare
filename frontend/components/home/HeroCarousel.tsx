@@ -3,10 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import gsap from 'gsap';
+import { SplitText } from 'gsap/SplitText';
+
+// Register once at module level — safe for SSR (Next.js runs this on client via 'use client')
+gsap.registerPlugin(SplitText);
 
 interface Slide {
   src: string;
   alt: string;
+  eyebrow: string;
   subtitle: string;
 }
 
@@ -14,21 +20,25 @@ const slides: Slide[] = [
   {
     src: '/web/grocerys.jpg',
     alt: 'Boxes of packaged grocery surplus items ready for collection',
+    eyebrow: 'Surplus Groceries',
     subtitle: 'Surplus groceries and everyday essentials — given, not wasted.',
   },
   {
     src: '/web/hero.jpg',
-    alt: 'Freshly baked bread and pastries at end of day ready for collection',
+    alt: 'Freshly baked bread and pastries at end of day',
+    eyebrow: 'Bakeries & Cafes',
     subtitle: 'Bakeries and cafes sharing what remains at the end of the day.',
   },
   {
     src: '/web/hero.png',
     alt: 'Crates of farm-fresh produce surplus ready for redistribution',
+    eyebrow: 'Farm Produce',
     subtitle: 'Fresh farm produce reaching the people who need it most.',
   },
   {
     src: '/web/more.jpg',
     alt: 'Community members exchanging a grocery bag at a local handover point',
+    eyebrow: 'Community',
     subtitle: 'Every pickup is a story. Every handover creates real impact.',
   },
 ];
@@ -40,16 +50,44 @@ export default function HeroCarousel() {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const headlineRef = useRef<HTMLHeadingElement>(null);
   const touchStartX = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasRevealedRef = useRef(false);
 
-  // Detect prefers-reduced-motion
+  // SSR-safe reduced-motion detection
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
     setReducedMotion(mq.matches);
     const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // GSAP SplitText line-mask reveal — fires once on first mount
+  useEffect(() => {
+    if (reducedMotion || hasRevealedRef.current || !headlineRef.current) return;
+    hasRevealedRef.current = true;
+
+    const ctx = gsap.context(() => {
+      const split = new SplitText(headlineRef.current!, {
+        type: 'lines',
+        mask: 'lines',
+      });
+      gsap.from(split.lines, {
+        yPercent: 110,
+        duration: 1.1,
+        ease: 'power4.out',
+        stagger: 0.09,
+        delay: 0.3,
+        onComplete: () => split.revert(),
+      });
+    }, headlineRef);
+
+    return () => ctx.revert();
+    // intentionally only on mount — reducedMotion guard handles the skip
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const goTo = useCallback((index: number) => {
@@ -59,7 +97,7 @@ export default function HeroCarousel() {
   const next = useCallback(() => goTo(current + 1), [current, goTo]);
   const prev = useCallback(() => goTo(current - 1), [current, goTo]);
 
-  // Auto-advance
+  // Auto-advance — skip if reducedMotion
   useEffect(() => {
     if (reducedMotion || paused) return;
     intervalRef.current = setInterval(next, AUTO_ADVANCE_MS);
@@ -68,7 +106,6 @@ export default function HeroCarousel() {
     };
   }, [next, paused, reducedMotion]);
 
-  // Touch swipe
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX;
   }
@@ -85,7 +122,7 @@ export default function HeroCarousel() {
 
   return (
     <section
-      aria-label="Essenshare hero"
+      aria-label="Essenshare hero carousel"
       className="relative overflow-hidden"
       style={{ height: 'clamp(520px, 88vh, 900px)' }}
       onMouseEnter={() => setPaused(true)}
@@ -93,15 +130,16 @@ export default function HeroCarousel() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Slides — all use next/image for WebP/AVIF optimization and responsive srcset */}
+      {/* ── Slides ── */}
       {slides.map((slide, idx) => (
         <div
           key={slide.src}
-          role="img"
-          aria-label={slide.alt}
           aria-hidden={idx !== current}
-          className="absolute inset-0 transition-opacity duration-700"
-          style={{ opacity: idx === current ? 1 : 0 }}
+          className="absolute inset-0"
+          style={{
+            opacity: idx === current ? 1 : 0,
+            transition: 'opacity 700ms var(--ease-inout)',
+          }}
         >
           <Image
             src={slide.src}
@@ -110,65 +148,219 @@ export default function HeroCarousel() {
             priority={idx === 0}
             className="object-cover object-center"
             sizes="100vw"
-            aria-hidden="true"
           />
         </div>
       ))}
 
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/55 z-10" aria-hidden="true" />
+      {/* ── Dark gradient overlay ── */}
+      <div
+        className="absolute inset-0 z-10"
+        aria-hidden="true"
+        style={{
+          background:
+            'linear-gradient(to bottom, oklch(0% 0 0 / 0.08) 0%, oklch(0% 0 0 / 0.45) 40%, oklch(0% 0 0 / 0.72) 100%)',
+        }}
+      />
 
-      {/* Content */}
-      <div className="relative z-20 flex flex-col items-center justify-center h-full px-4 text-center text-white">
-        <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold leading-tight max-w-4xl mb-4 drop-shadow-lg">
-          {HEADLINE}
-        </h1>
-        <p className="text-base sm:text-lg md:text-xl text-neutral-200 max-w-2xl mb-8 drop-shadow transition-opacity duration-500">
-          {slides[current].subtitle}
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            href="/find"
-            className="px-6 py-3 rounded-lg bg-primary text-white font-semibold text-base hover:bg-primary-dark transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
+      {/* ── Content — bottom-third, left-aligned ── */}
+      <div
+        className="relative z-20 flex flex-col justify-end h-full"
+        style={{ paddingInline: 'var(--space-page)', paddingBlockEnd: 'clamp(3rem, 6vw, 5rem)' }}
+      >
+        <div style={{ maxWidth: '48rem' }}>
+          {/* Eyebrow */}
+          <p
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              fontSize: 'var(--step--1)',
+              color: 'oklch(99% 0 0 / 0.70)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.10em',
+              fontWeight: 500,
+              marginBlockEnd: 'var(--space-s)',
+            }}
           >
-            Find Food Near Me
-          </Link>
-          <Link
-            href="/register"
-            className="px-6 py-3 rounded-lg bg-transparent text-white font-semibold text-base border-2 border-white hover:bg-white/10 transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/50"
+            {slides[current].eyebrow}
+          </p>
+
+          {/* Headline — constant, GSAP reveal target */}
+          <h1
+            ref={headlineRef}
+            style={{
+              fontSize: 'var(--display)',
+              fontWeight: 800,
+              color: 'oklch(99% 0 0)',
+              lineHeight: 1.0,
+              letterSpacing: '-0.03em',
+              textWrap: 'balance' as React.CSSProperties['textWrap'],
+              marginBlockEnd: 'var(--space-l)',
+            }}
           >
-            Become a Donor
-          </Link>
+            {HEADLINE}
+          </h1>
+
+          {/* Subtitle */}
+          <p
+            aria-live="polite"
+            aria-atomic="true"
+            style={{
+              fontSize: 'var(--step-1)',
+              color: 'oklch(99% 0 0 / 0.80)',
+              maxWidth: '36rem',
+              lineHeight: 1.55,
+              marginBlockEnd: 'var(--space-xl)',
+              transition: 'opacity 500ms var(--ease-out)',
+            }}
+          >
+            {slides[current].subtitle}
+          </p>
+
+          {/* CTAs */}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 'var(--space-s)',
+            }}
+          >
+            <Link
+              href="/find"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingInline: 'var(--space-xl)',
+                paddingBlock: '0.75rem',
+                borderRadius: 'var(--radius-pill)',
+                background: 'var(--accent)',
+                color: 'var(--accent-on)',
+                fontWeight: 700,
+                fontSize: 'var(--step-0)',
+                minHeight: '44px',
+                textDecoration: 'none',
+                border: '2px solid transparent',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+              }}
+            >
+              Find Food Near Me
+            </Link>
+            <Link
+              href="/register"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingInline: 'var(--space-xl)',
+                paddingBlock: '0.75rem',
+                borderRadius: 'var(--radius-pill)',
+                background: 'transparent',
+                color: 'oklch(99% 0 0)',
+                fontWeight: 700,
+                fontSize: 'var(--step-0)',
+                minHeight: '44px',
+                textDecoration: 'none',
+                border: '2px solid oklch(99% 0 0 / 0.70)',
+                transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast)',
+              }}
+            >
+              Become a Donor
+            </Link>
+          </div>
         </div>
       </div>
 
-      {/* Prev/Next arrows — hidden on mobile (logical CSS: inset-inline-start / inset-inline-end) */}
+      {/* ── Previous arrow — hidden on mobile ── */}
       <button
         type="button"
         onClick={prev}
         aria-label="Previous slide"
-        className="hidden sm:flex absolute inset-y-0 start-0 z-30 items-center px-4 text-white/70 hover:text-white transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="hidden sm:flex"
+        style={{
+          position: 'absolute',
+          insetBlockStart: '50%',
+          insetInlineStart: 'var(--space-l)',
+          transform: 'translateY(-50%)',
+          zIndex: 30,
+          width: '44px',
+          height: '44px',
+          borderRadius: '50%',
+          border: '1.5px solid oklch(99% 0 0 / 0.40)',
+          background: 'oklch(0% 0 0 / 0.25)',
+          color: 'oklch(99% 0 0)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'background var(--dur-fast)',
+        }}
       >
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M15 19l-7-7 7-7" />
         </svg>
       </button>
+
+      {/* ── Next arrow — hidden on mobile ── */}
       <button
         type="button"
         onClick={next}
         aria-label="Next slide"
-        className="hidden sm:flex absolute inset-y-0 end-0 z-30 items-center px-4 text-white/70 hover:text-white transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="hidden sm:flex"
+        style={{
+          position: 'absolute',
+          insetBlockStart: '50%',
+          insetInlineEnd: 'var(--space-l)',
+          transform: 'translateY(-50%)',
+          zIndex: 30,
+          width: '44px',
+          height: '44px',
+          borderRadius: '50%',
+          border: '1.5px solid oklch(99% 0 0 / 0.40)',
+          background: 'oklch(0% 0 0 / 0.25)',
+          color: 'oklch(99% 0 0)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'background var(--dur-fast)',
+        }}
       >
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M9 5l7 7-7 7" />
         </svg>
       </button>
 
-      {/* Dot indicators */}
+      {/* ── Dot indicators — bottom-end ── */}
       <div
         role="tablist"
-        aria-label="Carousel slides"
-        className="absolute bottom-6 inset-x-0 z-30 flex justify-center gap-2"
+        aria-label="Carousel slide indicators"
+        style={{
+          position: 'absolute',
+          insetBlockEnd: 'var(--space-l)',
+          insetInlineEnd: 'var(--space-l)',
+          zIndex: 30,
+          display: 'flex',
+          gap: 'var(--space-xs)',
+          alignItems: 'center',
+        }}
       >
         {slides.map((slide, idx) => (
           <button
@@ -176,13 +368,23 @@ export default function HeroCarousel() {
             type="button"
             role="tab"
             aria-selected={idx === current}
-            aria-label={`Slide ${idx + 1}: ${slide.subtitle}`}
+            aria-label={`Slide ${idx + 1}: ${slide.eyebrow}`}
             onClick={() => goTo(idx)}
-            className={`w-2.5 h-2.5 rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white ${
-              idx === current
-                ? 'bg-white scale-125'
-                : 'bg-white/50 hover:bg-white/75'
-            }`}
+            style={{
+              width: idx === current ? '24px' : '8px',
+              height: '8px',
+              borderRadius: 'var(--radius-pill)',
+              border: 'none',
+              background:
+                idx === current ? 'oklch(99% 0 0)' : 'oklch(99% 0 0 / 0.45)',
+              cursor: 'pointer',
+              padding: 0,
+              transition: 'width 300ms var(--ease-out), background 200ms',
+              minWidth: '8px',
+              // Ensure 44px touch target via padding
+              paddingBlock: '18px',
+              marginBlock: '-18px',
+            }}
           />
         ))}
       </div>

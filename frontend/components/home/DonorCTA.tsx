@@ -4,24 +4,139 @@ export default function DonorCTA() {
   return (
     <section
       aria-labelledby="donor-cta-heading"
-      className="py-20 bg-primary-light"
+      style={{
+        background: 'var(--surface-dark)',
+        paddingBlock: 'var(--space-section)',
+      }}
     >
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2
-          id="donor-cta-heading"
-          className="text-2xl sm:text-3xl font-bold text-text-base mb-3"
+      <div
+        style={{
+          maxInlineSize: 'var(--page-max)',
+          marginInline: 'auto',
+          paddingInline: 'var(--space-page)',
+        }}
+      >
+        {/* Section label */}
+        <p
+          style={{
+            fontSize: 'var(--step--1)',
+            color: 'var(--accent)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            fontWeight: 500,
+            marginBlockEnd: 'var(--space-s)',
+          }}
         >
-          Have surplus food? List it today.
-        </h2>
-        <p className="text-text-muted text-base mb-8">
-          It takes 2 minutes. No cost. Real impact.
+          Join the movement
         </p>
-        <Link
-          href="/register"
-          className="inline-flex items-center justify-center px-8 py-3.5 rounded-lg bg-primary text-white font-semibold text-base hover:bg-primary-dark transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+
+        {/* Heading + body — stacked on mobile, side-by-side on md+ */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-2xl)',
+          }}
+          className="md:flex-row md:items-end md:justify-between"
         >
-          Start Donating
-        </Link>
+          {/* Left: copy */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-m)',
+            }}
+          >
+            <h2
+              id="donor-cta-heading"
+              style={{
+                fontSize: 'var(--step-3)',
+                fontWeight: 700,
+                letterSpacing: '-0.025em',
+                lineHeight: 1.15,
+                color: 'var(--ink-on-dark)',
+                textWrap: 'balance' as React.CSSProperties['textWrap'],
+                maxInlineSize: '22ch',
+              }}
+            >
+              Your surplus is someone&rsquo;s dinner table.
+            </h2>
+
+            <p
+              style={{
+                fontSize: 'var(--step-0)',
+                color: 'var(--ink-on-dark-muted)',
+                lineHeight: 1.65,
+                maxInlineSize: '50ch',
+                textWrap: 'pretty' as React.CSSProperties['textWrap'],
+              }}
+            >
+              Register as a donor in under five minutes. List what you have,
+              set a collection window, and we handle everything else. No
+              administration. No paperwork. No cost.
+            </p>
+          </div>
+
+          {/* Right: CTAs */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-s)',
+              flexShrink: 0,
+            }}
+            className="sm:flex-row"
+          >
+            {/* Primary — accent */}
+            <Link
+              href="/register"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingInline: 'var(--space-xl)',
+                paddingBlock: '0.75rem',
+                borderRadius: 'var(--radius-pill)',
+                background: 'var(--accent)',
+                color: 'var(--accent-on)',
+                fontWeight: 700,
+                fontSize: 'var(--step-0)',
+                minHeight: '44px',
+                textDecoration: 'none',
+                border: '2px solid transparent',
+                transition: 'background var(--dur-fast) var(--ease-out)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Start Donating
+            </Link>
+
+            {/* Ghost — white outline */}
+            <Link
+              href="/about"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingInline: 'var(--space-xl)',
+                paddingBlock: '0.75rem',
+                borderRadius: 'var(--radius-pill)',
+                background: 'transparent',
+                color: 'oklch(99% 0 0 / 0.80)',
+                fontWeight: 700,
+                fontSize: 'var(--step-0)',
+                minHeight: '44px',
+                textDecoration: 'none',
+                border: '2px solid oklch(99% 0 0 / 0.35)',
+                transition:
+                  'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Learn How It Works
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );

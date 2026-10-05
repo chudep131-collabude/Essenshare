@@ -1,59 +1,157 @@
 const steps = [
   {
     number: '1',
-    title: 'Donors List Surplus',
-    description:
-      'Businesses, farms, and individuals post available food with pickup details. It takes 2 minutes and no cost.',
+    title: 'A donor lists surplus food',
+    body: 'Any individual or business with surplus food posts a listing — what it is, how much, where to collect, and for how long.',
+    detail: 'Takes under 2 minutes',
   },
   {
     number: '2',
-    title: 'Recipients Find Nearby',
-    description:
-      'Anyone can search by location and browse available donations. No account needed. Full anonymity guaranteed.',
+    title: 'Someone nearby sees it',
+    body: 'Anyone can browse without an account or login. No means-testing, no eligibility checks. If you need it, it is for you.',
+    detail: 'Anonymous browsing, always',
   },
   {
     number: '3',
-    title: 'Pickup Confirmed',
-    description:
-      'Recipient collects using a one-time pickup code. No account needed. No questions asked.',
+    title: 'They collect it. Done.',
+    body: 'The recipient contacts the donor through our anonymised system and arranges a pickup. No money changes hands. No data is stored after the transaction.',
+    detail: 'Zero friction, zero cost',
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section aria-labelledby="how-it-works-heading" className="py-16 bg-surface-alt">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
+    <section
+      aria-labelledby="how-it-works-heading"
+      style={{
+        background: 'var(--surface-soft)',
+        paddingBlock: 'var(--space-section)',
+      }}
+    >
+      <div
+        style={{
+          maxInlineSize: 'var(--page-max)',
+          marginInline: 'auto',
+          paddingInline: 'var(--space-page)',
+        }}
+      >
+        {/* Section header */}
+        <div style={{ marginBlockEnd: 'clamp(3rem, 6vw, 5rem)' }}>
+          <p
+            style={{
+              fontSize: 'var(--step--1)',
+              color: 'var(--accent)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              fontWeight: 500,
+              marginBlockEnd: 'var(--space-s)',
+            }}
+          >
+            How it works
+          </p>
           <h2
             id="how-it-works-heading"
-            className="text-2xl sm:text-3xl font-bold text-text-base mb-4"
+            style={{
+              fontSize: 'var(--step-3)',
+              fontWeight: 700,
+              letterSpacing: '-0.025em',
+              lineHeight: 1.15,
+              color: 'var(--ink)',
+              textWrap: 'balance' as React.CSSProperties['textWrap'],
+              maxInlineSize: '26ch',
+            }}
           >
-            How Essenshare Works
+            Three steps. No bureaucracy. No barriers.
           </h2>
-          <p className="text-text-muted text-base max-w-xl mx-auto">
-            Simple, dignified, and free. No accounts, no eligibility checks.
-          </p>
         </div>
 
+        {/* Steps — alternating editorial layout */}
         <ol
-          className="grid grid-cols-1 md:grid-cols-3 gap-8"
-          aria-label="How Essenshare works — 3 steps"
+          aria-label="How Essenshare works — three steps"
+          style={{
+            listStyle: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'clamp(3rem, 6vw, 5rem)',
+          }}
         >
-          {steps.map((step) => (
-            <li
-              key={step.number}
-              className="flex flex-col items-center text-center bg-surface rounded-xl p-8 border border-border-base shadow-sm"
-            >
-              <span
-                className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold mb-4 shrink-0"
-                aria-hidden="true"
+          {steps.map((step, index) => {
+            const isReversed = index % 2 === 1;
+
+            return (
+              <li
+                key={step.number}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-m)',
+                  alignItems: 'center',
+                }}
+                className={`sm:flex-row${isReversed ? ' sm:flex-row-reverse' : ''}`}
               >
-                {step.number}
-              </span>
-              <h3 className="text-lg font-semibold text-text-base mb-2">{step.title}</h3>
-              <p className="text-text-muted text-sm leading-relaxed">{step.description}</p>
-            </li>
-          ))}
+                {/* Large step number — purely decorative */}
+                <div
+                  aria-hidden="true"
+                  style={{
+                    flexShrink: 0,
+                    fontSize: 'clamp(6rem, 12vw, 14rem)',
+                    fontWeight: 800,
+                    color: 'var(--accent-muted)',
+                    lineHeight: 1,
+                    userSelect: 'none',
+                    // On mobile, reduce to reasonable size and centre
+                    minInlineSize: '0',
+                  }}
+                  className="sm:w-1/2 flex items-center justify-center"
+                >
+                  {step.number}
+                </div>
+
+                {/* Text content */}
+                <div
+                  className="sm:w-1/2"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 'var(--space-s)',
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: 'var(--step-2)',
+                      fontWeight: 700,
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.2,
+                      color: 'var(--ink)',
+                    }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: 'var(--step-0)',
+                      color: 'var(--ink-muted)',
+                      lineHeight: 1.65,
+                      maxInlineSize: '52ch',
+                      textWrap: 'pretty' as React.CSSProperties['textWrap'],
+                    }}
+                  >
+                    {step.body}
+                  </p>
+                  <p
+                    style={{
+                      fontSize: 'var(--step--1)',
+                      color: 'var(--accent)',
+                      fontWeight: 600,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    {step.detail}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </section>

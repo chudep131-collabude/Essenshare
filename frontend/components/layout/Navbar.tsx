@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -16,30 +16,41 @@ const navLinks = [
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
 
-  const toggleMenu = () => setMenuOpen((prev) => !prev);
+  useEffect(() => {
+    const handler = () => setScrolled(window.scrollY > 8);
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
+  }, []);
+
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-surface border-b border-border-base shadow-sm">
+    <header
+      className={cn(
+        'sticky top-0 z-50 bg-[var(--surface)] transition-shadow duration-[var(--dur-fast)]',
+        scrolled ? 'shadow-sm border-b border-[var(--line)]' : 'border-b border-[var(--line-subtle)]'
+      )}
+    >
       <nav
         aria-label="Main navigation"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16"
+        className="max-w-[1440px] mx-auto px-[var(--space-page)] flex items-center justify-between h-16"
       >
         {/* Logo */}
-        <Link href="/" className="shrink-0" onClick={closeMenu} aria-label="Essenshare home">
+        <Link href="/" onClick={closeMenu} aria-label="Essenshare home" className="shrink-0">
           <Image
             src="/essenshare_logo_transparent.png"
             alt="Essenshare"
             width={140}
-            height={32}
-            className="h-8 w-auto"
+            height={36}
+            className="h-9 w-auto"
             priority
           />
         </Link>
 
-        {/* Desktop nav links */}
+        {/* Desktop nav */}
         <ul className="hidden md:flex items-center gap-1" role="list">
           {navLinks.map(({ href, label }) => {
             const active = pathname === href || (href !== '/' && pathname.startsWith(href));
@@ -49,10 +60,10 @@ export default function Navbar() {
                   href={href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150',
+                    'relative px-[var(--space-m)] py-[var(--space-s)] text-[var(--step--1)] font-medium transition-colors duration-[var(--dur-fast)] rounded-sm',
                     active
-                      ? 'text-primary font-semibold'
-                      : 'text-neutral-700 hover:text-primary hover:bg-primary-light'
+                      ? 'text-[var(--accent)] after:absolute after:bottom-0 after:inset-x-[var(--space-m)] after:h-0.5 after:bg-[var(--accent)] after:rounded-pill'
+                      : 'text-[var(--ink-muted)] hover:text-[var(--ink)]'
                   )}
                 >
                   {label}
@@ -62,25 +73,19 @@ export default function Navbar() {
           })}
         </ul>
 
-        {/* Desktop auth buttons */}
-        <div className="hidden md:flex items-center gap-2">
+        {/* Desktop auth */}
+        <div className="hidden md:flex items-center gap-[var(--space-m)]">
           <Link
             href="/login"
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-semibold border border-primary text-primary hover:bg-primary-light transition-colors duration-150',
-              pathname === '/login' && 'bg-primary-light'
-            )}
             aria-current={pathname === '/login' ? 'page' : undefined}
+            className="text-[var(--step--1)] font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors duration-[var(--dur-fast)]"
           >
             Login
           </Link>
           <Link
             href="/register"
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary-dark transition-colors duration-150',
-              pathname === '/register' && 'bg-primary-dark'
-            )}
             aria-current={pathname === '/register' ? 'page' : undefined}
+            className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[38px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
           >
             Register
           </Link>
@@ -89,11 +94,11 @@ export default function Navbar() {
         {/* Mobile hamburger */}
         <button
           type="button"
-          className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-neutral-700 hover:text-primary hover:bg-primary-light transition-colors duration-150"
+          className="md:hidden inline-flex items-center justify-center w-11 h-11 rounded-md text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-          onClick={toggleMenu}
+          onClick={() => setMenuOpen((p) => !p)}
         >
           {menuOpen ? (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -107,13 +112,13 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile menu overlay */}
+      {/* Mobile menu */}
       {menuOpen && (
         <div
           id="mobile-nav"
-          className="md:hidden absolute inset-x-0 top-16 bg-surface border-b border-border-base shadow-lg z-40"
+          className="md:hidden bg-[var(--surface)] border-b border-[var(--line)] shadow-md"
         >
-          <ul className="px-4 pt-2 pb-4 space-y-1" role="list">
+          <ul className="px-[var(--space-page)] pt-[var(--space-s)] pb-[var(--space-l)] space-y-1" role="list">
             {navLinks.map(({ href, label }) => {
               const active = pathname === href || (href !== '/' && pathname.startsWith(href));
               return (
@@ -123,10 +128,10 @@ export default function Navbar() {
                     onClick={closeMenu}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'block px-4 py-3 rounded-lg text-base font-medium transition-colors duration-150',
+                      'block w-full px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium transition-colors duration-[var(--dur-fast)]',
                       active
-                        ? 'bg-primary-light text-primary font-semibold'
-                        : 'text-neutral-700 hover:bg-primary-light hover:text-primary'
+                        ? 'bg-[var(--accent-muted)] text-[var(--accent-dark)] font-semibold'
+                        : 'text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]'
                     )}
                   >
                     {label}
@@ -134,18 +139,18 @@ export default function Navbar() {
                 </li>
               );
             })}
-            <li className="pt-2 flex flex-col gap-2">
+            <li className="pt-[var(--space-s)] flex flex-col gap-[var(--space-s)]">
               <Link
                 href="/login"
                 onClick={closeMenu}
-                className="block w-full text-center px-4 py-3 rounded-lg text-base font-semibold border border-primary text-primary hover:bg-primary-light transition-colors duration-150"
+                className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
               >
                 Login
               </Link>
               <Link
                 href="/register"
                 onClick={closeMenu}
-                className="block w-full text-center px-4 py-3 rounded-lg text-base font-semibold bg-primary text-white hover:bg-primary-dark transition-colors duration-150"
+                className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)]"
               >
                 Register
               </Link>

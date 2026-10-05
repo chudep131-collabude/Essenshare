@@ -10,6 +10,9 @@ import { apiFetch, ApiException } from '@/lib/api';
 // For client pages, metadata is set in a parent server wrapper if needed.
 // The layout template handles the title pattern automatically.
 
+const inputClass =
+  'w-full px-4 py-2.5 rounded-md border border-line text-sm text-ink placeholder:text-ink-quiet bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-accent';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,13 +52,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[70vh] flex items-center justify-center px-[var(--space-page)] py-section">
       <div className="w-full max-w-md">
-        <div className="bg-surface border border-border-base rounded-2xl shadow-sm p-8">
-          <h1 className="text-2xl font-bold text-text-base mb-2 text-center">Donor Login</h1>
-          <p className="text-text-muted text-sm text-center mb-8">
+        <div className="bg-surface border border-line rounded-lg shadow-sm p-8">
+          <h1
+            className="text-step-2 font-bold text-ink mb-2 text-center"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Donor Login
+          </h1>
+          <p className="text-ink-muted text-sm text-center mb-8">
             Recipients don&apos;t need an account.{' '}
-            <Link href="/find" className="text-primary font-medium">
+            <Link href="/find" className="text-accent font-medium hover:text-accent-dark">
               Find food here
             </Link>
           </p>
@@ -71,7 +79,7 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="login-email"
-                  className="block text-sm font-medium text-text-base mb-1"
+                  className="block text-sm font-medium text-ink mb-1"
                 >
                   Email address
                 </label>
@@ -82,7 +90,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-border-base text-sm text-text-base placeholder:text-text-muted bg-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={inputClass}
                   placeholder="you@example.com"
                 />
               </div>
@@ -90,7 +98,7 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="login-password"
-                  className="block text-sm font-medium text-text-base mb-1"
+                  className="block text-sm font-medium text-ink mb-1"
                 >
                   Password
                 </label>
@@ -101,13 +109,16 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg border border-border-base text-sm text-text-base placeholder:text-text-muted bg-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={inputClass}
                   placeholder="••••••••"
                 />
               </div>
 
               <div className="flex justify-end">
-                <Link href="/forgot-password" className="text-sm text-primary hover:text-primary-dark">
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-accent hover:text-accent-dark"
+                >
                   Forgot password?
                 </Link>
               </div>
@@ -115,7 +126,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-primary text-white font-semibold text-sm hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2"
                 aria-busy={loading}
               >
                 {loading && <LoadingSpinner size="sm" label="Signing in" />}
@@ -124,9 +135,12 @@ export default function LoginPage() {
             </div>
           </form>
 
-          <p className="mt-6 text-center text-sm text-text-muted">
+          <p className="mt-6 text-center text-sm text-ink-muted">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-primary font-medium hover:text-primary-dark">
+            <Link
+              href="/register"
+              className="text-accent font-medium hover:text-accent-dark"
+            >
               Register
             </Link>
           </p>

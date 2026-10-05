@@ -42,33 +42,37 @@ const principles = [
 
 export default function AboutPage() {
   return (
-    <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Hero image */}
-      <div className="w-full rounded-xl overflow-hidden mb-10">
+    <article className="max-w-page mx-auto px-[var(--space-page)] py-section">
+      {/* Hero image — full-width, 400px height, object-cover */}
+      <div className="w-full rounded-md overflow-hidden mb-10">
         <Image
           src="/web/about.jpg"
           alt="A community food sharing moment — hands exchanging fresh food in a warm setting"
           width={1200}
           height={400}
-          className="w-full h-[280px] sm:h-[360px] object-cover"
+          className="w-full h-[400px] object-cover"
           priority
         />
       </div>
 
       {/* Mission */}
       <section aria-labelledby="mission-heading" className="mb-12">
-        <h1 id="mission-heading" className="text-3xl sm:text-4xl font-bold text-text-base mb-4">
+        <h1
+          id="mission-heading"
+          className="text-step-3 font-bold text-ink mb-4"
+          style={{ letterSpacing: '-0.02em' }}
+        >
           About Essenshare
         </h1>
-        <p className="text-lg text-primary font-semibold mb-4 italic">
+        <p className="text-step-1 text-accent font-semibold mb-4 italic">
           &ldquo;No good food should become waste while someone nearby is hungry.&rdquo;
         </p>
-        <p className="text-text-muted leading-relaxed mb-4">
+        <p className="text-ink-muted leading-relaxed mb-4 max-w-prose">
           Essenshare is a free, nonprofit-operated platform that connects people who have surplus
           food with people who need it — in the same neighbourhood, on the same day. No
           bureaucracy, no means-testing, no waiting lists.
         </p>
-        <p className="text-text-muted leading-relaxed">
+        <p className="text-ink-muted leading-relaxed max-w-prose">
           We believe access to food is a right, not a privilege. Our platform is built to be as
           frictionless as possible for recipients, and as simple as possible for donors.
         </p>
@@ -76,7 +80,11 @@ export default function AboutPage() {
 
       {/* How it works */}
       <section aria-labelledby="how-heading" className="mb-12">
-        <h2 id="how-heading" className="text-2xl font-bold text-text-base mb-6">
+        <h2
+          id="how-heading"
+          className="text-step-2 font-bold text-ink mb-6"
+          style={{ letterSpacing: '-0.02em' }}
+        >
           How It Works
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -99,10 +107,10 @@ export default function AboutPage() {
           ].map((item) => (
             <div
               key={item.role}
-              className="bg-surface-alt rounded-xl p-6 border border-border-base"
+              className="bg-surface-soft rounded-md p-6 border border-line"
             >
-              <h3 className="text-base font-semibold text-primary mb-2">{item.role}</h3>
-              <p className="text-sm text-text-muted leading-relaxed">{item.description}</p>
+              <h3 className="text-base font-semibold text-accent mb-2">{item.role}</h3>
+              <p className="text-sm text-ink-muted leading-relaxed">{item.description}</p>
             </div>
           ))}
         </div>
@@ -110,22 +118,26 @@ export default function AboutPage() {
 
       {/* Principles */}
       <section aria-labelledby="principles-heading" className="mb-12">
-        <h2 id="principles-heading" className="text-2xl font-bold text-text-base mb-6">
+        <h2
+          id="principles-heading"
+          className="text-step-2 font-bold text-ink mb-6"
+          style={{ letterSpacing: '-0.02em' }}
+        >
           Platform Principles
         </h2>
         <ol className="space-y-4" aria-label="Essenshare platform principles">
           {principles.map((p) => (
             <li key={p.number} className="flex gap-4">
               <span
-                className="shrink-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold"
+                className="shrink-0 w-8 h-8 rounded-full bg-accent text-[var(--accent-on)] flex items-center justify-center text-sm font-bold"
                 aria-hidden="true"
               >
                 {p.number}
               </span>
               <div>
-                <span className="font-semibold text-text-base">{p.title}</span>
+                <span className="font-semibold text-ink">{p.title}</span>
                 {' — '}
-                <span className="text-text-muted">{p.description}</span>
+                <span className="text-ink-muted">{p.description}</span>
               </div>
             </li>
           ))}
@@ -134,15 +146,19 @@ export default function AboutPage() {
 
       {/* Operating model */}
       <section aria-labelledby="operating-heading" className="mb-12">
-        <h2 id="operating-heading" className="text-2xl font-bold text-text-base mb-4">
+        <h2
+          id="operating-heading"
+          className="text-step-2 font-bold text-ink mb-4"
+          style={{ letterSpacing: '-0.02em' }}
+        >
           Operating Model
         </h2>
-        <p className="text-text-muted leading-relaxed mb-4">
+        <p className="text-ink-muted leading-relaxed mb-4 max-w-prose">
           Essenshare operates as a nonprofit platform. There is no charge to donors or recipients.
           The platform does not sell data, display advertising, or seek profit. Operating costs are
           covered by grants and community contributions.
         </p>
-        <p className="text-text-muted leading-relaxed">
+        <p className="text-ink-muted leading-relaxed max-w-prose">
           All impact data is published publicly. We report only what is real: completed,
           confirmed pickups. We never inflate numbers.
         </p>
@@ -151,12 +167,16 @@ export default function AboutPage() {
       {/* Liability */}
       <section
         aria-labelledby="liability-heading"
-        className="bg-surface-alt border border-border-base rounded-xl p-6"
+        className="bg-surface-soft border border-line rounded-md p-6"
       >
-        <h2 id="liability-heading" className="text-lg font-semibold text-text-base mb-3">
+        <h2
+          id="liability-heading"
+          className="text-step-1 font-semibold text-ink mb-3"
+          style={{ letterSpacing: '-0.02em' }}
+        >
           Liability Statement
         </h2>
-        <p className="text-sm text-text-muted leading-relaxed">
+        <p className="text-sm text-ink-muted leading-relaxed max-w-prose">
           The platform makes no warranty regarding the safety of any food listed by donors. The
           platform facilitates connections between donors and recipients, requires donors to agree
           to a safety policy, and operates a reporting system to remove unsafe listings. The

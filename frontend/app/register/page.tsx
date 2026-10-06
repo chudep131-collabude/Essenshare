@@ -1,16 +1,53 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
+import type React from 'react';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { apiFetch, ApiException } from '@/lib/api';
+import { apiPost, ApiException } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type DonorRole = 'individual' | 'business' | 'organisation' | null;
 
+// ── Role icons — 24px stroke SVGs, accent colour, consistent 1.5 stroke weight ──
+function IconPerson() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="7" r="4" />
+      <path d="M4 21v-1a8 8 0 0 1 16 0v1" />
+    </svg>
+  );
+}
+
+function IconStorefront() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9.5 5 4h14l2 5.5" />
+      <path d="M3 9.5h18v1.5a3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1-3 3 3 3 0 0 1-3-3v-1.5Z" />
+      <path d="M5 14.5V20h14v-5.5" />
+      <path d="M9 20v-5h6v5" />
+    </svg>
+  );
+}
+
+function IconOrg() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <circle cx="17.5" cy="17.5" r="3.5" />
+      <path d="M17.5 15.5v2l1.5 1" />
+    </svg>
+  );
+}
+
 interface RoleCard {
   id: DonorRole & string;
-  icon: string;
+  Icon: () => React.JSX.Element;
   title: string;
   description: string;
 }
@@ -18,23 +55,30 @@ interface RoleCard {
 const roleCards: RoleCard[] = [
   {
     id: 'individual',
-    icon: '👤',
+    Icon: IconPerson,
     title: 'Individual Donor',
-    description: 'I have surplus food from my home, allotment, or personal surplus.',
+    description: 'I have surplus food from my home, allotment, or personal surplus. A Samaritan who wants to help their community.',
   },
   {
     id: 'business',
-    icon: '🏪',
+    Icon: IconStorefront,
     title: 'Business Donor',
-    description: 'I represent a shop, bakery, café, restaurant, or other business.',
+    description: 'I represent a shop, bakery, café, restaurant, farm, or wholesaler with surplus that should reach people, not the bin.',
   },
   {
     id: 'organisation',
-    icon: '🏢',
-    title: 'Organisation',
-    description: 'I represent a food bank, charity, NGO, or community group.',
+    Icon: IconOrg,
+    title: 'Organisation / Partner',
+    description: 'I represent a food bank, charity, NGO, or community group. We want to coordinate redistribution at scale.',
   },
 ];
+
+// Map UI role slugs → backend role enum values
+const ROLE_MAP: Record<string, string> = {
+  individual:   'INDIVIDUAL_DONOR',
+  business:     'BUSINESS_DONOR',
+  organisation: 'ORGANIZATION',
+};
 
 const businessCategories = [
   'Bakery', 'Café / Coffee shop', 'Restaurant', 'Supermarket', 'Grocery store',
@@ -71,11 +115,29 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      await apiFetch('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ role, ...form }),
-      });
-      window.location.href = '/register/verify';
+      // Map UI field names → backend schema field names
+      const backendRole = role ? ROLE_MAP[role] : null;
+      const payload: Record<string, string | undefined> = {
+        role:          backendRole ?? undefined,
+        email:         form.email,
+        password:      form.password,
+        phone:         form.phone || undefined,
+        country_code:  form.country_code || undefined,
+      };
+
+      if (role === 'individual') {
+        payload.full_name = [form.firstName, form.lastName].filter(Boolean).join(' ') || undefined;
+      } else if (role === 'business') {
+        payload.business_name = form.businessName;
+        payload.full_name     = form.contactName || undefined;
+      } else if (role === 'organisation') {
+        payload.org_name  = form.orgName;
+        payload.full_name = form.contactName || undefined;
+      }
+
+      const envelope = await apiPost<{ user: { id: string } }>('/auth/register', payload);
+      const uid = envelope.data?.user?.id ?? '';
+      window.location.href = uid ? `/register/verify?uid=${uid}` : '/register/verify';
     } catch (err) {
       if (err instanceof ApiException) {
         if (err.status === 501) {
@@ -98,12 +160,12 @@ export default function RegisterPage() {
           className="text-step-2 font-bold text-ink mb-2 text-center"
           style={{ letterSpacing: '-0.02em' }}
         >
-          Register as a Donor
+          Start Donating
         </h1>
         <p className="text-ink-muted text-sm text-center mb-8">
-          Already have an account?{' '}
+          Five minutes to set up. A lifetime of surplus turning into someone&apos;s meal.{' '}
           <a href="/login" className="text-accent font-medium hover:text-accent-dark">
-            Sign in
+            Already registered? Sign in.
           </a>
         </p>
 
@@ -114,7 +176,7 @@ export default function RegisterPage() {
               id="role-heading"
               className="text-base font-semibold text-ink mb-4 text-center"
             >
-              Step 1 of 2 — Who are you registering as?
+              How are you contributing?
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {roleCards.map((card) => (
@@ -130,7 +192,9 @@ export default function RegisterPage() {
                   )}
                   aria-pressed={role === card.id}
                 >
-                  <span className="text-3xl mb-3" aria-hidden="true">{card.icon}</span>
+                  <span className="mb-4 flex items-center justify-center w-12 h-12 rounded-full bg-accent-muted" aria-hidden="true">
+                    <card.Icon />
+                  </span>
                   <span className="text-sm font-semibold text-ink mb-1">{card.title}</span>
                   <span className="text-xs text-ink-muted leading-relaxed">{card.description}</span>
                 </button>
@@ -147,7 +211,7 @@ export default function RegisterPage() {
                 id="form-heading"
                 className="text-base font-semibold text-ink"
               >
-                Step 2 of 2 — Your details
+                Step 2 of 2 Your details
               </h2>
               <button
                 type="button"

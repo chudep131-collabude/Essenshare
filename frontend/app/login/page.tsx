@@ -4,7 +4,7 @@ import { useState, FormEvent } from 'react';
 import Link from 'next/link';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { apiFetch, ApiException } from '@/lib/api';
+import { apiPost, setAccessToken, ApiException } from '@/lib/api';
 
 // Note: metadata cannot be exported from a 'use client' file.
 // For client pages, metadata is set in a parent server wrapper if needed.
@@ -30,11 +30,15 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await apiFetch('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-      // On success, redirect to dashboard (Phase 2)
+      const envelope = await apiPost<{ user: { role: string }; accessToken: string }>(
+        '/auth/login',
+        { email, password }
+      );
+      // Store the access token in memory — refresh token is in an httpOnly cookie
+      if (envelope.data?.accessToken) {
+        setAccessToken(envelope.data.accessToken);
+      }
+      // On success, redirect to dashboard (Phase 3 — donor dashboard coming)
       window.location.href = '/';
     } catch (err) {
       if (err instanceof ApiException) {
@@ -62,9 +66,9 @@ export default function LoginPage() {
             Donor Login
           </h1>
           <p className="text-ink-muted text-sm text-center mb-8">
-            Recipients don&apos;t need an account.{' '}
+            Looking for food?{' '}
             <Link href="/find" className="text-accent font-medium hover:text-accent-dark">
-              Find food here
+              No account needed. Find food here.
             </Link>
           </p>
 

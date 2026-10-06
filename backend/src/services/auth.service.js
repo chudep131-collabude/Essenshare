@@ -84,8 +84,15 @@ async function issueTokenPair(user, ipAddress, userAgent) {
   const rawRefresh   = signRefreshToken({ sub: user.id });
   const refreshHash  = sha256(rawRefresh);
 
+  // Guard: ms() returns undefined for empty/unparseable strings.
+  // Fall back to 7 days (in ms) to prevent Invalid Date from poisoning expires_at.
+  const FALLBACK_REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  const parsedTtl = ms(config.jwt.refreshExpiresIn);
+  const refreshTtlMs = (typeof parsedTtl === 'number' && parsedTtl > 0)
+    ? parsedTtl
+    : FALLBACK_REFRESH_TTL_MS;
+
   // Refresh token TTL: derived from JWT config to keep DB and JWT in sync
-  const refreshTtlMs = ms(config.jwt.refreshExpiresIn);
   const expiresAt = new Date(Date.now() + refreshTtlMs);
 
   await RefreshToken.create({
@@ -113,8 +120,9 @@ function serviceError(message, code, statusCode) {
 
 /**
  * Register a new user.
- * Creates the user row and the role-specific profile row atomically.
- * Sends an email verification OTP.
+ * Creates the user row and the role-specific profile row atomically
+ * inside a single DB transaction — neither row is committed unless both succeed.
+ * Sends an email verification OTP after the transaction commits.
  *
  * @param {object} data - { email, password, role, full_name, phone, country_code, org_name, business_name }
  * @param {string} ipAddress
@@ -128,7 +136,7 @@ async function register(data, ipAddress) {
     throw serviceError('org_name is required for ORGANIZATION role.', 'ORG_NAME_REQUIRED', 400);
   }
 
-  // Check if email is already taken
+  // Check if email is already taken (outside transaction — read-only, no lock needed)
   const existing = await User.findByEmail(email);
   if (existing) {
     throw serviceError('An account with this email address already exists.', 'EMAIL_TAKEN', 409);
@@ -136,18 +144,48 @@ async function register(data, ipAddress) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // Create user row — never log email value
-  const user = await User.create({ email, password_hash: passwordHash, role, full_name, phone, country_code });
-  logger.info('auth.service: user created', { userId: user.id, role });
+  // Acquire a dedicated client and wrap both INSERTs in a transaction.
+  // If the profile row creation fails, the users row is rolled back, freeing the email.
+  const client = await pool.connect();
+  let user;
+  try {
+    await client.query('BEGIN');
 
-  // Create role-specific profile
-  if (role === 'INDIVIDUAL_DONOR' || role === 'BUSINESS_DONOR') {
-    await Donor.create({ user_id: user.id, display_name: full_name, business_name: business_name || null });
-  } else if (role === 'ORGANIZATION') {
-    await Organization.create({ user_id: user.id, org_name });
+    // INSERT user row — parameterised, never log email value
+    const userResult = await client.query(
+      `INSERT INTO users (email, password_hash, role, full_name, phone, country_code)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [email, passwordHash, role, full_name || null, phone || null, country_code || null]
+    );
+    user = userResult.rows[0];
+
+    // INSERT role-specific profile row
+    if (role === 'INDIVIDUAL_DONOR' || role === 'BUSINESS_DONOR') {
+      await client.query(
+        `INSERT INTO donors (user_id, display_name, business_name)
+         VALUES ($1, $2, $3)`,
+        [user.id, full_name || null, business_name || null]
+      );
+    } else if (role === 'ORGANIZATION') {
+      await client.query(
+        `INSERT INTO organizations (user_id, org_name)
+         VALUES ($1, $2)`,
+        [user.id, org_name]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  // Generate and store OTP (only hash stored)
+  logger.info('auth.service: user created', { userId: user.id, role });
+
+  // Generate and store OTP (only hash stored) — outside transaction; email is now committed
   const otp     = generateOtp();
   const otpHash = sha256(otp);
   const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes

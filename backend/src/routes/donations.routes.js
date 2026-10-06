@@ -1,39 +1,76 @@
 /**
  * routes/donations.routes.js
- * Donation listing and management — Phase 1 stubs.
+ * Donation listing and management.
+ * All stub routes are now replaced with real implementations.
  */
 
 'use strict';
 
 const router = require('express').Router();
-const { authenticateToken } = require('../middleware/auth');
-const { success, created } = require('../utils/response');
+const { authenticateToken, requireRole } = require('../middleware/auth');
+const { validateBody, validateQuery } = require('../middleware/validate');
+const {
+  createDonation,
+  listDonations,
+  listMyDonations,
+  getDonation,
+  updateDonation,
+  deleteDonation,
+  createDonationSchema,
+  updateDonationSchema,
+  listDonationsQuerySchema,
+  myListingsQuerySchema,
+} = require('../controllers/donation.controller');
 
-const STUB_PAYLOAD = { phase: 'Phase 1 stub - not yet implemented' };
+const DONOR_ROLES = ['INDIVIDUAL_DONOR', 'BUSINESS_DONOR'];
 
-// GET /api/v1/donations — list donations (public)
-router.get('/', (req, res) => {
-  return success(res, STUB_PAYLOAD, 'List donations stub');
-});
+// ── Public routes ─────────────────────────────────────────────────────────────
 
-// POST /api/v1/donations — create donation (auth required)
-router.post('/', authenticateToken, (req, res) => {
-  return created(res, STUB_PAYLOAD, 'Create donation stub');
-});
+// GET /api/v1/donations — list active donations (optional proximity search)
+router.get(
+  '/',
+  validateQuery(listDonationsQuerySchema),
+  listDonations
+);
 
-// GET /api/v1/donations/:id — single donation (public)
-router.get('/:id', (req, res) => {
-  return success(res, STUB_PAYLOAD, 'Get donation stub');
-});
+// GET /api/v1/donations/mine — donor's own listings (auth required, before /:id)
+router.get(
+  '/mine',
+  authenticateToken,
+  requireRole(...DONOR_ROLES),
+  validateQuery(myListingsQuerySchema),
+  listMyDonations
+);
 
-// PATCH /api/v1/donations/:id — update donation (auth required)
-router.patch('/:id', authenticateToken, (req, res) => {
-  return success(res, STUB_PAYLOAD, 'Update donation stub');
-});
+// GET /api/v1/donations/:id — single donation detail (public)
+router.get('/:id', getDonation);
 
-// DELETE /api/v1/donations/:id — delete donation (auth required)
-router.delete('/:id', authenticateToken, (req, res) => {
-  return success(res, STUB_PAYLOAD, 'Delete donation stub');
-});
+// ── Authenticated donor routes ─────────────────────────────────────────────────
+
+// POST /api/v1/donations — create a donation listing
+router.post(
+  '/',
+  authenticateToken,
+  requireRole(...DONOR_ROLES),
+  validateBody(createDonationSchema),
+  createDonation
+);
+
+// PATCH /api/v1/donations/:id — update own donation
+router.patch(
+  '/:id',
+  authenticateToken,
+  requireRole(...DONOR_ROLES),
+  validateBody(updateDonationSchema),
+  updateDonation
+);
+
+// DELETE /api/v1/donations/:id — cancel (soft-delete) own donation
+router.delete(
+  '/:id',
+  authenticateToken,
+  requireRole(...DONOR_ROLES),
+  deleteDonation
+);
 
 module.exports = router;

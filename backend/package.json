@@ -1,12 +1,12 @@
 {
   "name": "surplus-api",
   "version": "1.0.0",
-  "description": "Global Surplus Redistribution Platform — Backend API",
+  "description": "Global Surplus Redistribution Platform Backend API",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "db:migrate": "echo db:migrate placeholder",
+    "db:migrate": "node src/config/migrate.js",
     "db:rollback": "echo db:rollback placeholder"
   },
   "engines": {

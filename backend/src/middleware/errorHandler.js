@@ -37,7 +37,7 @@ function globalErrorHandler(err, req, res, next) {
     name: err.name,
     method: req.method,
     url: req.originalUrl,
-    // Log sanitised body — never raw body
+    // Log sanitised body never raw body
     body: safeBody,
     statusCode: err.statusCode || 500,
     // Stack only in dev logs
@@ -60,7 +60,18 @@ function globalErrorHandler(err, req, res, next) {
     return unauthorized(res, 'Authentication token has expired');
   }
 
-  // Generic server error — no stack in production
+  // Service-layer errors: explicit statusCode + code
+  if (err.statusCode && err.statusCode >= 400 && err.statusCode < 600) {
+    return res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+      code: err.code || 'SERVICE_ERROR',
+      data: null,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Generic server error no stack in production
   const message = config.isDev
     ? `${err.message}${err.stack ? `\n${err.stack}` : ''}`
     : 'Internal server error';

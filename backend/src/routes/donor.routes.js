@@ -70,4 +70,36 @@ router.post('/locations', authenticateToken, (req, res) => {
   return created(res, STUB_PAYLOAD, 'Add donor location stub');
 });
 
+// GET /api/v1/donors/pickups — paginated pickup history for the authenticated donor
+router.get(
+  '/pickups',
+  authenticateToken,
+  requireRole('INDIVIDUAL_DONOR', 'BUSINESS_DONOR'),
+  async (req, res, next) => {
+    try {
+      const Pickup = require('../models/Pickup');
+      const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+      const offset = (page - 1) * limit;
+
+      const [pickups, total] = await Promise.all([
+        Pickup.findByDonor(req.user.sub, { limit, offset }),
+        Pickup.countByDonor(req.user.sub),
+      ]);
+
+      return success(res, {
+        pickups,
+        pagination: {
+          total,
+          page,
+          limit,
+          total_pages: Math.ceil(total / limit),
+        },
+      }, 'Pickup history retrieved');
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
 module.exports = router;

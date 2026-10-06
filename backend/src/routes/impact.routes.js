@@ -12,17 +12,14 @@ const { success } = require('../utils/response');
 
 const STUB_PAYLOAD = { phase: 'Phase 2 stub - not yet implemented' };
 
-// GET /api/v1/impact/summary — real aggregate queries
+// GET /api/v1/impact/summary — aggregate queries backed by impact_records table
 router.get('/summary', async (req, res, next) => {
   try {
     const { pool } = require('../config/database');
 
-    const [pickupsRes, weightRes, orgsRes, countriesRes] = await Promise.all([
+    const [impactRes, orgsRes, countriesRes] = await Promise.all([
       pool.query(
-        `SELECT COUNT(*) AS count FROM audit_logs WHERE action = 'PICKUP_COMPLETED'`
-      ),
-      pool.query(
-        `SELECT COALESCE(SUM(total_weight_kg), 0) AS total FROM donors`
+        `SELECT COUNT(*) AS count, COALESCE(SUM(weight_kg), 0) AS weight FROM impact_records`
       ),
       pool.query(
         `SELECT COUNT(*) AS count FROM users
@@ -38,8 +35,8 @@ router.get('/summary', async (req, res, next) => {
     ]);
 
     return success(res, {
-      total_pickups:           parseInt(pickupsRes.rows[0].count, 10),
-      weight_redistributed_kg: parseFloat(weightRes.rows[0].total),
+      total_pickups:           parseInt(impactRes.rows[0].count, 10),
+      weight_redistributed_kg: parseFloat(impactRes.rows[0].weight),
       partner_organisations:   parseInt(orgsRes.rows[0].count, 10),
       countries:               parseInt(countriesRes.rows[0].count, 10),
     });

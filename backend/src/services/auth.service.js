@@ -19,6 +19,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const ms = require('ms');
 
 const config = require('../config/env');
 const { logger } = require('../utils/logger');
@@ -83,8 +84,9 @@ async function issueTokenPair(user, ipAddress, userAgent) {
   const rawRefresh   = signRefreshToken({ sub: user.id });
   const refreshHash  = sha256(rawRefresh);
 
-  // Refresh token TTL: 30 days
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  // Refresh token TTL: derived from JWT config to keep DB and JWT in sync
+  const refreshTtlMs = ms(config.jwt.refreshExpiresIn);
+  const expiresAt = new Date(Date.now() + refreshTtlMs);
 
   await RefreshToken.create({
     user_id:    user.id,
@@ -121,6 +123,11 @@ function serviceError(message, code, statusCode) {
 async function register(data, ipAddress) {
   const { email, password, role, full_name, phone, country_code, org_name, business_name } = data;
 
+  // Validate org_name BEFORE any DB write to prevent orphaned user rows
+  if (role === 'ORGANIZATION' && !org_name) {
+    throw serviceError('org_name is required for ORGANIZATION role.', 'ORG_NAME_REQUIRED', 400);
+  }
+
   // Check if email is already taken
   const existing = await User.findByEmail(email);
   if (existing) {
@@ -137,9 +144,6 @@ async function register(data, ipAddress) {
   if (role === 'INDIVIDUAL_DONOR' || role === 'BUSINESS_DONOR') {
     await Donor.create({ user_id: user.id, display_name: full_name, business_name: business_name || null });
   } else if (role === 'ORGANIZATION') {
-    if (!org_name) {
-      throw serviceError('org_name is required for ORGANIZATION role.', 'ORG_NAME_REQUIRED', 400);
-    }
     await Organization.create({ user_id: user.id, org_name });
   }
 
@@ -318,7 +322,19 @@ async function verifyEmail(data, ipAddress) {
   }
 
   await Verification.markUsed(record.id);
-  await User.markEmailVerified(user_id);
+
+  // ORGANIZATION users enter PENDING_APPROVAL after email verification;
+  // all other roles become ACTIVE immediately.
+  const user = await User.findById(user_id);
+  if (!user) {
+    throw serviceError('User not found.', 'USER_NOT_FOUND', 404);
+  }
+
+  if (user.role === 'ORGANIZATION') {
+    await User.updateById(user_id, { email_verified: true, status: 'PENDING_APPROVAL' });
+  } else {
+    await User.markEmailVerified(user_id);
+  }
 
   logger.info('auth.service: email verified', { userId: user_id });
 

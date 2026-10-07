@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiPost, setAccessToken, ApiException } from '@/lib/api';
+import { apiFetch, apiPost, setAccessToken } from '@/lib/api';
 
 interface AuthUser {
   id: string;
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Silent refresh on mount to restore session from httpOnly cookie
     (async () => {
       try {
-        const envelope = await apiPost<{ user: AuthUser; accessToken: string }>('/auth/refresh', {});
+        const envelope = await apiFetch<{ user: AuthUser; accessToken: string }>('/auth/refresh', { method: 'POST' });
         if (envelope.data?.accessToken) {
           setAccessToken(envelope.data.accessToken);
           setTokenState(envelope.data.accessToken);

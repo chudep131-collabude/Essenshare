@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { ApiException } from '@/lib/api';
@@ -11,9 +11,10 @@ import { useAuth } from '@/lib/auth-context';
 const inputClass =
   'w-full px-4 py-2.5 rounded-md border border-line text-sm text-ink placeholder:text-ink-quiet bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-accent';
 
-export default function LoginPage() {
+function LoginForm() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +32,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const loggedInUser = await login(email, password);
-      // Redirect based on role returned directly from login call
+      // Read ?next= param, validate it is a relative path to prevent open redirect
+      const next = searchParams.get('next');
+      const safeNext =
+        next && next.startsWith('/') && !next.startsWith('//') ? next : null;
+
       const role = loggedInUser?.role;
-      if (role === 'INDIVIDUAL_DONOR' || role === 'BUSINESS_DONOR') {
+      if (safeNext) {
+        router.push(safeNext);
+      } else if (role === 'INDIVIDUAL_DONOR' || role === 'BUSINESS_DONOR') {
         router.push('/dashboard');
       } else {
         router.push('/');
@@ -139,5 +146,14 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrap in Suspense because LoginForm uses useSearchParams()
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -167,7 +167,7 @@ export default function PickupCodeModal({ donationId, onClose, triggerRef }: Pic
           type="button"
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-soft transition-colors"
+          className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-surface-soft transition-colors"
         >
           <svg
             className="w-5 h-5"

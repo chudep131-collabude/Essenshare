@@ -47,7 +47,6 @@ export default function FindPage() {
     error: null,
     loading: false,
   });
-  const [manualLocation, setManualLocation] = useState('');
   const [category, setCategory] = useState('');
   const [distance, setDistance] = useState('5');
 
@@ -207,20 +206,6 @@ export default function FindPage() {
             )}
             Use My Location
           </button>
-
-          <div className="flex-1">
-            <label htmlFor="manual-location" className="sr-only">
-              Enter your city or postcode
-            </label>
-            <input
-              id="manual-location"
-              type="text"
-              value={manualLocation}
-              onChange={(e) => setManualLocation(e.target.value)}
-              placeholder="Or enter city / postcode…"
-              className={inputClass}
-            />
-          </div>
         </div>
 
         {location.error && (

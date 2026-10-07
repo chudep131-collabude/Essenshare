@@ -1,25 +1,46 @@
 /**
  * routes/reports.routes.js
- * Safety/incident report routes — Phase 1 stubs.
+ * Safety report routes — Phase 4 implementation.
+ * POST / is intentionally unauthenticated (anonymous reports allowed).
+ * Middleware order: authenticateToken → requireRole → validateBody/validateQuery → handler.
  */
-
 'use strict';
 
 const router = require('express').Router();
-const { authenticateToken } = require('../middleware/auth');
-const { requireRole } = require('../middleware/auth');
-const { success, created } = require('../utils/response');
+const { authenticateToken, requireRole } = require('../middleware/auth');
+const { validateBody, validateQuery } = require('../middleware/validate');
+const {
+  submitReport,
+  listReports,
+  resolveReport,
+  submitReportSchema,
+  listReportsQuerySchema,
+  resolveReportSchema,
+} = require('../controllers/report.controller');
 
-const STUB_PAYLOAD = { phase: 'Phase 1 stub - not yet implemented' };
+// POST /api/v1/reports — public (anonymous reports allowed)
+router.post(
+  '/',
+  validateBody(submitReportSchema),
+  submitReport
+);
 
-// POST /api/v1/reports — submit a report (public — no auth per spec)
-router.post('/', (req, res) => {
-  return created(res, STUB_PAYLOAD, 'Submit report stub');
-});
+// GET /api/v1/reports — ADMIN only
+router.get(
+  '/',
+  authenticateToken,
+  requireRole('ADMIN'),
+  validateQuery(listReportsQuerySchema),
+  listReports
+);
 
-// GET /api/v1/reports — list reports (auth + admin required)
-router.get('/', authenticateToken, requireRole('admin', 'super_admin'), (req, res) => {
-  return success(res, STUB_PAYLOAD, 'List reports stub');
-});
+// PATCH /api/v1/reports/:id/resolve — ADMIN only
+router.patch(
+  '/:id/resolve',
+  authenticateToken,
+  requireRole('ADMIN'),
+  validateBody(resolveReportSchema),
+  resolveReport
+);
 
 module.exports = router;

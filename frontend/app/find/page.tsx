@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { apiFetch } from '@/lib/api';
@@ -56,6 +56,10 @@ export default function FindPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pickupTarget, setPickupTarget] = useState<string | null>(null);
+  const pickupTriggerRef = useRef<HTMLElement | null>(null);
+
+  // Ref tracks whether the current page change is a load-more (false = reset from filter)
+  const isLoadMoreRef = useRef(false);
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -90,50 +94,64 @@ export default function FindPage() {
     );
   }, []);
 
-  async function fetchDonations(lat: number, lng: number, resetPage = false) {
-    const currentPage = resetPage ? 1 : page;
-    if (resetPage) setPage(1);
-    setSearchState('loading');
-    try {
-      const params = new URLSearchParams({
-        lat: String(lat),
-        lng: String(lng),
-        radius_km: distance,
-        page: String(currentPage),
-        limit: '20',
-      });
-      if (category && CATEGORY_MAP[category]) {
-        params.set('category', CATEGORY_MAP[category]);
-      }
-      const envelope = await apiFetch<{ donations: Donation[]; total: number }>(
-        `/donations?${params}`
-      );
-      const data = envelope.data;
-      if (!data || data.donations.length === 0) {
-        setSearchState('empty');
-        setDonations([]);
-        setTotal(0);
-      } else {
-        setSearchState('data');
-        if (resetPage) {
-          setDonations(data.donations);
-        } else {
-          setDonations((prev) => [...prev, ...data.donations]);
+  // Core fetch — accepts explicit page number to avoid stale closure
+  const runFetch = useCallback(
+    async (lat: number, lng: number, targetPage: number, append: boolean) => {
+      setSearchState('loading');
+      try {
+        const params = new URLSearchParams({
+          lat: String(lat),
+          lng: String(lng),
+          radius_km: distance,
+          page: String(targetPage),
+          limit: '20',
+        });
+        if (category && CATEGORY_MAP[category]) {
+          params.set('category', CATEGORY_MAP[category]);
         }
-        setTotal(data.total);
+        const envelope = await apiFetch<{ donations: Donation[]; total: number }>(
+          `/donations?${params}`
+        );
+        const data = envelope.data;
+        if (!data || data.donations.length === 0) {
+          setSearchState(append ? 'data' : 'empty');
+          if (!append) {
+            setDonations([]);
+            setTotal(0);
+          }
+        } else {
+          setSearchState('data');
+          setDonations((prev) => (append ? [...prev, ...data.donations] : data.donations));
+          setTotal(data.total);
+        }
+      } catch {
+        setSearchState('error');
       }
-    } catch {
-      setSearchState('error');
-    }
-  }
+    },
+    [distance, category]
+  );
 
-  // Trigger re-fetch when location or filters change
+  // Trigger reset fetch when location or filters change
   useEffect(() => {
     if (location.lat && location.lng) {
-      fetchDonations(location.lat, location.lng, true);
+      isLoadMoreRef.current = false;
+      setPage(1);
+      runFetch(location.lat, location.lng, 1, false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.lat, location.lng, distance, category]);
+  }, [location.lat, location.lng, distance, category, runFetch]);
+
+  // Trigger append fetch when page increments via Load More
+  useEffect(() => {
+    if (page > 1 && isLoadMoreRef.current && location.lat && location.lng) {
+      runFetch(location.lat, location.lng, page, true);
+    }
+  }, [page, location.lat, location.lng, runFetch]);
+
+  function handleLoadMore() {
+    if (!location.lat || !location.lng) return;
+    isLoadMoreRef.current = true;
+    setPage((prev) => prev + 1);
+  }
 
   const inputClass =
     'w-full px-4 py-2.5 rounded-md border border-line text-sm text-ink placeholder:text-ink-quiet bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-accent';
@@ -320,20 +338,17 @@ export default function FindPage() {
               <DonationCard
                 key={donation.id}
                 donation={donation}
-                onRequestPickup={(id) => setPickupTarget(id)}
+                onRequestPickup={(id, trigger) => {
+                  if (trigger) pickupTriggerRef.current = trigger;
+                  setPickupTarget(id);
+                }}
               />
             ))}
             {hasMore && (
               <div className="pt-4 text-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    const nextPage = page + 1;
-                    setPage(nextPage);
-                    if (location.lat && location.lng) {
-                      fetchDonations(location.lat, location.lng, false);
-                    }
-                  }}
+                  onClick={handleLoadMore}
                   className="inline-flex items-center justify-center px-6 py-2.5 rounded-md border border-line text-sm font-medium text-ink hover:bg-surface-soft transition-colors min-h-[44px]"
                 >
                   Load more
@@ -377,7 +392,7 @@ export default function FindPage() {
               type="button"
               onClick={() => {
                 if (location.lat && location.lng) {
-                  fetchDonations(location.lat, location.lng, true);
+                  runFetch(location.lat, location.lng, page, false);
                 }
               }}
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors min-h-[44px]"
@@ -389,7 +404,11 @@ export default function FindPage() {
       </section>
 
       {/* Pickup code modal */}
-      <PickupCodeModal donationId={pickupTarget} onClose={() => setPickupTarget(null)} />
+      <PickupCodeModal
+        donationId={pickupTarget}
+        triggerRef={pickupTriggerRef}
+        onClose={() => setPickupTarget(null)}
+      />
     </div>
   );
 }

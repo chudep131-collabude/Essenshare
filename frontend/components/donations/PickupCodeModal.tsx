@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Alert from '@/components/ui/Alert';
 import { apiFetch, ApiException } from '@/lib/api';
@@ -23,9 +23,10 @@ interface PickupResponse {
 interface PickupCodeModalProps {
   donationId: string | null;
   onClose: () => void;
+  triggerRef?: RefObject<HTMLElement | null>;
 }
 
-export default function PickupCodeModal({ donationId, onClose }: PickupCodeModalProps) {
+export default function PickupCodeModal({ donationId, onClose, triggerRef }: PickupCodeModalProps) {
   const [state, setState] = useState<'loading' | 'success' | 'error'>('loading');
   const [pickup, setPickup] = useState<PickupResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -89,9 +90,6 @@ export default function PickupCodeModal({ donationId, onClose }: PickupCodeModal
     // Capture a non-null reference for use inside the keydown closure
     const trapTarget: HTMLDivElement = dialog;
     // Focus the dialog container itself on open so the trap is immediately active.
-    // Tab key handler below manages element-level cycling dynamically (re-queries
-    // each keystroke) so new buttons appearing after loading resolves are captured
-    // without re-running this effect.
     trapTarget.focus();
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -120,8 +118,12 @@ export default function PickupCodeModal({ donationId, onClose }: PickupCodeModal
       }
     }
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [donationId, onClose]);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      // Return focus to the element that triggered the modal (WCAG SC 3.2.2 / ARIA modal pattern)
+      triggerRef?.current?.focus();
+    };
+  }, [donationId, onClose, triggerRef]);
 
   async function handleCancel() {
     if (!pickup) return;
@@ -148,7 +150,6 @@ export default function PickupCodeModal({ donationId, onClose }: PickupCodeModal
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      aria-hidden={!donationId}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-[var(--ink)] opacity-40" aria-hidden="true" />

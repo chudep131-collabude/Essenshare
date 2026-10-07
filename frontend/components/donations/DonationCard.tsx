@@ -59,7 +59,7 @@ const REPORT_CATEGORIES = [
 
 interface DonationCardProps {
   donation: Donation;
-  onRequestPickup?: (donationId: string) => void;
+  onRequestPickup?: (donationId: string, trigger?: HTMLElement) => void;
   showCancelButton?: boolean;
   onCancel?: (donationId: string) => void | Promise<void>;
 }
@@ -190,7 +190,7 @@ export default function DonationCard({
       {onRequestPickup && !isExpired && (
         <button
           type="button"
-          onClick={() => onRequestPickup(donation.id)}
+          onClick={(e) => onRequestPickup(donation.id, e.currentTarget)}
           aria-label={`Get pickup code for ${donation.title}`}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 min-h-[44px]"
         >
@@ -278,7 +278,7 @@ export default function DonationCard({
               <button
                 type="submit"
                 disabled={reportStatus === 'loading' || !reportCategory}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-soft border border-line text-xs font-medium text-ink hover:bg-line transition-colors disabled:opacity-50 min-h-[36px]"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-soft border border-line text-xs font-medium text-ink hover:bg-line transition-colors disabled:opacity-50 min-h-[44px]"
               >
                 {reportStatus === 'loading' && (
                   <LoadingSpinner size="sm" label="Submitting" />

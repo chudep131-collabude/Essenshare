@@ -73,7 +73,7 @@ export default function PostDonationPage() {
     }
   }, [user, authLoading, router]);
 
-  function useCurrentLocation() {
+  function handleGetCurrentLocation() {
     if (!navigator.geolocation) {
       setGeoError('Geolocation is not supported by your browser.');
       return;
@@ -361,7 +361,7 @@ export default function PostDonationPage() {
               </span>
               <button
                 type="button"
-                onClick={useCurrentLocation}
+                onClick={handleGetCurrentLocation}
                 disabled={geoLoading}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-line text-xs font-medium text-ink-muted hover:bg-surface-soft transition-colors disabled:opacity-50 min-h-[36px]"
                 aria-busy={geoLoading}

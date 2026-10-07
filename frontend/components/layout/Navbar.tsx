@@ -32,9 +32,15 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 bg-[var(--surface)] transition-shadow duration-[var(--dur-fast)]',
-        scrolled ? 'shadow-sm border-b border-[var(--line)]' : 'border-b border-[var(--line-subtle)]'
+        'sticky top-0 z-50 bg-[var(--surface)]',
+        scrolled ? 'border-b border-[var(--line)]' : 'border-b border-[var(--line-subtle)]'
       )}
+      style={{
+        boxShadow: scrolled
+          ? '0 8px 24px oklch(0% 0 0 / 0.08), 0 2px 6px oklch(0% 0 0 / 0.04)'
+          : 'none',
+        transition: `box-shadow var(--dur-fast) var(--ease-out)`,
+      }}
     >
       <nav
         aria-label="Main navigation"
@@ -89,7 +95,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => void logout()}
-                className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[38px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
+                className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[44px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
               >
                 Sign Out
               </button>
@@ -106,7 +112,7 @@ export default function Navbar() {
               <Link
                 href="/register"
                 aria-current={pathname === '/register' ? 'page' : undefined}
-                className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[38px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
+                className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[44px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
               >
                 Start Donating
               </Link>
@@ -135,73 +141,79 @@ export default function Navbar() {
         </button>
       </nav>
 
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div
-          id="mobile-nav"
-          className="md:hidden bg-[var(--surface)] border-b border-[var(--line)] shadow-md"
-        >
-          <ul className="px-[var(--space-page)] pt-[var(--space-s)] pb-[var(--space-l)] space-y-1" role="list">
-            {navLinks.map(({ href, label }) => {
-              const active = pathname === href || (href !== '/' && pathname.startsWith(href));
-              return (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    onClick={closeMenu}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'block w-full px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium transition-colors duration-[var(--dur-fast)]',
-                      active
-                        ? 'bg-[var(--accent-muted)] text-[var(--accent-dark)] font-semibold'
-                        : 'text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]'
-                    )}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              );
-            })}
-            <li className="pt-[var(--space-s)] flex flex-col gap-[var(--space-s)]">
-              {user ? (
-                <>
-                  <Link
-                    href="/dashboard"
-                    onClick={closeMenu}
-                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
-                  >
-                    Dashboard
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => { closeMenu(); void logout(); }}
-                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)]"
-                  >
-                    Sign Out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    onClick={closeMenu}
-                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/register"
-                    onClick={closeMenu}
-                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)]"
-                  >
-                    Start Donating
-                  </Link>
-                </>
-              )}
-            </li>
-          </ul>
-        </div>
-      )}
+      {/* Mobile menu — always rendered, animated via maxHeight/opacity */}
+      <div
+        id="mobile-nav"
+        className="md:hidden overflow-hidden"
+        aria-hidden={!menuOpen}
+        style={{
+          maxHeight: menuOpen ? '600px' : '0',
+          opacity: menuOpen ? 1 : 0,
+          transition: `max-height var(--dur-base) var(--ease-out), opacity var(--dur-fast) var(--ease-out)`,
+          backgroundColor: 'var(--surface)',
+          borderBottom: menuOpen ? '1px solid var(--line)' : 'none',
+        }}
+      >
+        <ul className="px-[var(--space-page)] pt-[var(--space-s)] pb-[var(--space-l)] space-y-1" role="list">
+          {navLinks.map(({ href, label }) => {
+            const active = pathname === href || (href !== '/' && pathname.startsWith(href));
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  onClick={closeMenu}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'block w-full px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium transition-colors duration-[var(--dur-fast)]',
+                    active
+                      ? 'bg-[var(--accent-muted)] text-[var(--accent-dark)] font-semibold'
+                      : 'text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--ink)]'
+                  )}
+                >
+                  {label}
+                </Link>
+              </li>
+            );
+          })}
+          <li className="pt-[var(--space-s)] flex flex-col gap-[var(--space-s)]">
+            {user ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  onClick={closeMenu}
+                  className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)] min-h-[44px] flex items-center justify-center"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { closeMenu(); void logout(); }}
+                  className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] min-h-[44px]"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={closeMenu}
+                  className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)] min-h-[44px] flex items-center justify-center"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={closeMenu}
+                  className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] min-h-[44px] flex items-center justify-center"
+                >
+                  Start Donating
+                </Link>
+              </>
+            )}
+          </li>
+        </ul>
+      </div>
     </header>
   );
 }

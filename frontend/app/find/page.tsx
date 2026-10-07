@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import gsap from 'gsap';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { apiFetch } from '@/lib/api';
@@ -15,15 +16,6 @@ interface LocationState {
 }
 
 type SearchState = 'idle' | 'loading' | 'data' | 'empty' | 'error';
-
-const CATEGORY_MAP: Record<string, string> = {
-  groceries: 'GROCERIES',
-  bakery: 'BAKERY',
-  produce: 'PRODUCE',
-  prepared: 'PREPARED_FOOD',
-  dairy: 'DAIRY',
-  other: 'OTHER',
-};
 
 // Skeleton card for loading state
 function SkeletonCard() {
@@ -55,7 +47,9 @@ export default function FindPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pickupTarget, setPickupTarget] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const pickupTriggerRef = useRef<HTMLElement | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // Ref tracks whether the current page change is a load-more (false = reset from filter)
   const isLoadMoreRef = useRef(false);
@@ -93,7 +87,7 @@ export default function FindPage() {
     );
   }, []);
 
-  // Core fetch — accepts explicit page number to avoid stale closure
+  // Core fetch accepts explicit page number to avoid stale closure
   const runFetch = useCallback(
     async (lat: number, lng: number, targetPage: number, append: boolean) => {
       setSearchState('loading');
@@ -105,8 +99,9 @@ export default function FindPage() {
           page: String(targetPage),
           limit: '20',
         });
-        if (category && CATEGORY_MAP[category]) {
-          params.set('category', CATEGORY_MAP[category]);
+        // FIX 1: category state now holds uppercase enum values directly
+        if (category) {
+          params.set('category', category);
         }
         const envelope = await apiFetch<{ donations: Donation[]; total: number }>(
           `/donations?${params}`
@@ -130,6 +125,29 @@ export default function FindPage() {
     [distance, category]
   );
 
+  // Pre-location preview: fetch recently listed on mount when no location
+  useEffect(() => {
+    (async () => {
+      try {
+        setSearchState('loading');
+        const envelope = await apiFetch<{ donations: Donation[]; total: number }>(
+          '/donations?page=1&limit=6'
+        );
+        const data = envelope.data;
+        if (data && data.donations.length > 0) {
+          setDonations(data.donations);
+          setTotal(data.total);
+          setSearchState('data');
+        } else {
+          setSearchState('idle');
+        }
+      } catch {
+        setSearchState('idle');
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Trigger reset fetch when location or filters change
   useEffect(() => {
     if (location.lat && location.lng) {
@@ -137,7 +155,7 @@ export default function FindPage() {
       setPage(1);
       runFetch(location.lat, location.lng, 1, false);
     }
-  }, [location.lat, location.lng, distance, category, runFetch]);
+  }, [location.lat, location.lng, distance, category, runFetch, retryKey]);
 
   // Trigger append fetch when page increments via Load More
   useEffect(() => {
@@ -145,6 +163,22 @@ export default function FindPage() {
       runFetch(location.lat, location.lng, page, true);
     }
   }, [page, location.lat, location.lng, runFetch]);
+
+  // Scroll entrance animation when results arrive
+  useEffect(() => {
+    if (searchState !== 'data') return;
+    const rm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (rm) return;
+    const cards = resultsRef.current?.querySelectorAll('article');
+    if (!cards || cards.length === 0) return;
+    gsap.from(Array.from(cards), {
+      y: 20,
+      opacity: 0,
+      duration: 0.45,
+      ease: 'power3.out',
+      stagger: 0.06,
+    });
+  }, [searchState]);
 
   function handleLoadMore() {
     if (!location.lat || !location.lng) return;
@@ -156,6 +190,9 @@ export default function FindPage() {
     'w-full px-4 py-2.5 rounded-md border border-line text-sm text-ink placeholder:text-ink-quiet bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-accent';
 
   const hasMore = donations.length < total;
+
+  // Heading changes based on whether location is active
+  const resultsHeading = location.lat ? 'Nearby Donations' : 'Recently Listed';
 
   return (
     <div className="max-w-page mx-auto px-[var(--space-page)] py-section">
@@ -229,6 +266,7 @@ export default function FindPage() {
             >
               Category
             </label>
+            {/* FIX 1: option values are uppercase enum strings */}
             <select
               id="category-filter"
               value={category}
@@ -236,12 +274,12 @@ export default function FindPage() {
               className={inputClass}
             >
               <option value="">All categories</option>
-              <option value="groceries">Groceries</option>
-              <option value="bakery">Bakery &amp; Café</option>
-              <option value="produce">Fresh Produce</option>
-              <option value="prepared">Prepared Meals</option>
-              <option value="dairy">Dairy</option>
-              <option value="other">Other</option>
+              <option value="GROCERIES">Groceries</option>
+              <option value="BAKERY">Bakery &amp; Café</option>
+              <option value="PRODUCE">Fresh Produce</option>
+              <option value="PREPARED_FOOD">Prepared Meals</option>
+              <option value="DAIRY">Dairy</option>
+              <option value="OTHER">Other</option>
             </select>
           </div>
 
@@ -275,10 +313,10 @@ export default function FindPage() {
           className="text-step-1 font-semibold text-ink mb-4"
           style={{ letterSpacing: '-0.02em' }}
         >
-          Nearby Donations
+          {resultsHeading}
         </h2>
 
-        {/* Idle — prompt to share location */}
+        {/* Idle prompt to share location */}
         {searchState === 'idle' && (
           <div className="py-16 text-center border border-dashed border-line rounded-md">
             <svg
@@ -307,7 +345,7 @@ export default function FindPage() {
           </div>
         )}
 
-        {/* Loading — 3 skeleton cards */}
+        {/* Loading 3 skeleton cards */}
         {searchState === 'loading' && (
           <div className="space-y-4" aria-label="Loading results" aria-busy="true">
             <SkeletonCard />
@@ -316,9 +354,9 @@ export default function FindPage() {
           </div>
         )}
 
-        {/* Data — real results */}
+        {/* Data real results */}
         {searchState === 'data' && donations.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4" ref={resultsRef}>
             {donations.map((donation) => (
               <DonationCard
                 key={donation.id}
@@ -361,9 +399,16 @@ export default function FindPage() {
               />
             </svg>
             <p className="text-ink font-medium mb-1">Nothing available nearby right now.</p>
-            <p className="text-ink-muted text-sm">
+            <p className="text-ink-muted text-sm mb-4">
               Try expanding the distance or checking back later.
             </p>
+            <button
+              type="button"
+              onClick={() => setDistance('25')}
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-md border border-line text-sm font-medium text-ink hover:bg-surface-soft transition-colors min-h-[44px]"
+            >
+              Expand to 25 km
+            </button>
           </div>
         )}
 
@@ -376,13 +421,14 @@ export default function FindPage() {
             <button
               type="button"
               onClick={() => {
+                setRetryKey((k) => k + 1);
                 if (location.lat && location.lng) {
                   runFetch(location.lat, location.lng, page, false);
                 }
               }}
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors min-h-[44px]"
             >
-              Retry
+              Try again
             </button>
           </div>
         )}

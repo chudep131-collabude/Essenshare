@@ -31,6 +31,7 @@ export default function PickupCodeModal({ donationId, onClose, triggerRef }: Pic
   const [pickup, setPickup] = useState<PickupResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingId = `pickup-modal-heading-${donationId}`;
 
@@ -82,7 +83,7 @@ export default function PickupCodeModal({ donationId, onClose, triggerRef }: Pic
     if (donationId) requestPickup();
   }, [donationId, requestPickup]);
 
-  // Focus trap & Escape key — runs only when modal opens/closes, not on state transitions
+  // Focus trap & Escape key runs only when modal opens/closes, not on state transitions
   useEffect(() => {
     if (!donationId) return;
     const dialog = dialogRef.current;
@@ -131,7 +132,7 @@ export default function PickupCodeModal({ donationId, onClose, triggerRef }: Pic
     try {
       await apiFetch(`/pickups/${pickup.pickup_id}`, { method: 'DELETE' });
     } catch {
-      // ignore — close regardless
+      // ignore close regardless
     }
     setCancelLoading(false);
     onClose();
@@ -151,8 +152,16 @@ export default function PickupCodeModal({ donationId, onClose, triggerRef }: Pic
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-[var(--ink)] opacity-40" aria-hidden="true" />
+      {/* Backdrop — blur + dim */}
+      <div
+        className="absolute inset-0"
+        aria-hidden="true"
+        style={{
+          backdropFilter: 'blur(4px) brightness(0.72)',
+          WebkitBackdropFilter: 'blur(4px) brightness(0.72)',
+          backgroundColor: 'oklch(0% 0 0 / 0.25)',
+        }}
+      />
 
       {/* Dialog */}
       <div
@@ -204,12 +213,52 @@ export default function PickupCodeModal({ donationId, onClose, triggerRef }: Pic
           <>
             <div className="text-center py-4">
               <p
-                className="text-5xl font-mono font-bold tracking-widest text-accent"
-                style={{ fontVariantNumeric: 'tabular-nums' }}
                 aria-label={`Pickup code: ${pickup.display_code}`}
+                style={{
+                  fontSize: 'clamp(2rem, 10vw, 3.5rem)',
+                  fontVariantNumeric: 'tabular-nums',
+                  letterSpacing: '0.12em',
+                  color: 'var(--accent)',
+                  fontWeight: 800,
+                  fontFamily: 'monospace',
+                  animation: 'codeReveal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both',
+                }}
               >
                 {pickup.display_code}
               </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!pickup?.display_code) return;
+                  try {
+                    await navigator.clipboard.writeText(pickup.display_code);
+                  } catch {
+                    return;
+                  }
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                aria-label="Copy pickup code to clipboard"
+                style={{
+                  marginBlockStart: 'var(--space-s)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-xs)',
+                  paddingInline: 'var(--space-m)',
+                  paddingBlock: '0.4rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--line)',
+                  background: 'var(--surface)',
+                  color: copied ? 'var(--success)' : 'var(--ink-muted)',
+                  fontSize: 'var(--step--1)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: `color var(--dur-fast)`,
+                  minHeight: '36px',
+                }}
+              >
+                {copied ? 'Copied!' : 'Copy code'}
+              </button>
               <p className="mt-3 text-sm text-ink-muted">
                 Show this code to the donor when you collect.
               </p>

@@ -42,6 +42,32 @@ interface FormState {
   is_vegetarian: boolean;
 }
 
+function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        borderBlockStart: '1px solid var(--line)',
+        paddingBlockStart: 'var(--space-xl)',
+        marginBlockStart: 'var(--space-xl)',
+      }}
+    >
+      <p
+        style={{
+          fontSize: 'var(--step--1)',
+          color: 'var(--accent)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          fontWeight: 600,
+          marginBlockEnd: 'var(--space-xl)',
+        }}
+      >
+        {label}
+      </p>
+      <div className="space-y-5">{children}</div>
+    </div>
+  );
+}
+
 export default function PostDonationPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -50,6 +76,7 @@ export default function PostDonationPage() {
   const [allergens, setAllergens] = useState<string[]>([]);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [showCoords, setShowCoords] = useState(false);
   const [form, setForm] = useState<FormState>({
     title: '',
     description: '',
@@ -88,6 +115,7 @@ export default function PostDonationPage() {
           pickup_lng: pos.coords.longitude.toFixed(6),
         }));
         setGeoLoading(false);
+        // coords filled, but keep showCoords false — user doesn't need to see them
       },
       (err) => {
         setGeoError(
@@ -154,6 +182,28 @@ export default function PostDonationPage() {
 
   if (!user) return null;
 
+  const pillBase: React.CSSProperties = {
+    paddingInline: 'var(--space-m)',
+    paddingBlock: '0.4rem',
+    borderRadius: 'var(--radius-pill)',
+    fontSize: 'var(--step--1)',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast)',
+    minHeight: '36px',
+    display: 'inline-flex',
+    alignItems: 'center',
+  };
+
+  function allergenPillStyle(active: boolean): React.CSSProperties {
+    return {
+      ...pillBase,
+      border: `1.5px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+      background: active ? 'var(--accent-muted)' : 'var(--surface)',
+      color: active ? 'var(--accent-dark)' : 'var(--ink-muted)',
+    };
+  }
+
   return (
     <div className="max-w-page mx-auto px-[var(--space-page)] py-section">
       <div className="max-w-2xl mx-auto">
@@ -173,294 +223,335 @@ export default function PostDonationPage() {
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} noValidate className="space-y-6">
-          {/* Title */}
-          <div>
-            <label htmlFor="d-title" className="block text-sm font-medium text-ink mb-1">
-              Title{' '}
-              <span className="text-error" aria-label="required">
-                *
-              </span>
-            </label>
-            <input
-              id="d-title"
-              type="text"
-              required
-              value={form.title}
-              onChange={(e) => setField('title', e.target.value)}
-              className={inputClass}
-              placeholder="e.g. Fresh bread from today"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label htmlFor="d-desc" className="block text-sm font-medium text-ink mb-1">
-              Description
-            </label>
-            <textarea
-              id="d-desc"
-              rows={3}
-              value={form.description}
-              onChange={(e) => setField('description', e.target.value)}
-              className={cn(inputClass, 'resize-none')}
-              placeholder="Any additional details…"
-            />
-          </div>
-
-          {/* Category */}
-          <div>
-            <label htmlFor="d-cat" className="block text-sm font-medium text-ink mb-1">
-              Category{' '}
-              <span className="text-error" aria-label="required">
-                *
-              </span>
-            </label>
-            <select
-              id="d-cat"
-              required
-              value={form.category}
-              onChange={(e) => setField('category', e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Select a category…</option>
-              {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Quantity */}
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} noValidate>
+          {/* Section 1 — What you're donating */}
+          <div className="space-y-5">
+            {/* Title */}
             <div>
-              <label htmlFor="d-qty" className="block text-sm font-medium text-ink mb-1">
-                Quantity{' '}
+              <label htmlFor="d-title" className="block text-sm font-medium text-ink mb-1">
+                Title{' '}
                 <span className="text-error" aria-label="required">
                   *
                 </span>
               </label>
               <input
-                id="d-qty"
-                type="number"
+                id="d-title"
+                type="text"
                 required
-                min={1}
-                value={form.quantity}
-                onChange={(e) => setField('quantity', e.target.value)}
+                value={form.title}
+                onChange={(e) => setField('title', e.target.value)}
                 className={inputClass}
-                style={{ fontVariantNumeric: 'tabular-nums' }}
+                placeholder="e.g. Fresh bread from today"
               />
             </div>
+
+            {/* Description */}
             <div>
-              <label htmlFor="d-unit" className="block text-sm font-medium text-ink mb-1">
-                Unit{' '}
+              <label htmlFor="d-desc" className="block text-sm font-medium text-ink mb-1">
+                Description
+              </label>
+              <textarea
+                id="d-desc"
+                rows={3}
+                value={form.description}
+                onChange={(e) => setField('description', e.target.value)}
+                className={cn(inputClass, 'resize-none')}
+                placeholder="Any additional details…"
+              />
+            </div>
+
+            {/* Category */}
+            <div>
+              <label htmlFor="d-cat" className="block text-sm font-medium text-ink mb-1">
+                Category{' '}
                 <span className="text-error" aria-label="required">
                   *
                 </span>
               </label>
               <select
-                id="d-unit"
-                value={form.quantity_unit}
-                onChange={(e) => setField('quantity_unit', e.target.value)}
+                id="d-cat"
+                required
+                value={form.category}
+                onChange={(e) => setField('category', e.target.value)}
                 className={inputClass}
               >
-                {UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
+                <option value="">Select a category…</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* Weight */}
-          <div>
-            <label htmlFor="d-weight" className="block text-sm font-medium text-ink mb-1">
-              Approximate weight (kg)
-            </label>
-            <input
-              id="d-weight"
-              type="number"
-              step="0.1"
-              min={0}
-              value={form.weight_kg}
-              onChange={(e) => setField('weight_kg', e.target.value)}
-              className={inputClass}
-              style={{ fontVariantNumeric: 'tabular-nums' }}
-            />
-          </div>
-
-          {/* Allergens */}
-          <fieldset>
-            <legend className="block text-sm font-medium text-ink mb-2">Allergens present</legend>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {ALLERGENS.map((a) => (
-                <label key={a} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={allergens.includes(a)}
-                    onChange={() => toggleAllergen(a)}
-                    className="w-4 h-4 accent-[var(--accent)]"
-                  />
-                  {a}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Dietary */}
-          <fieldset>
-            <legend className="block text-sm font-medium text-ink mb-2">Dietary</legend>
-            <div className="flex flex-wrap gap-4">
-              {(
-                [
-                  ['is_halal', 'Halal'],
-                  ['is_vegan', 'Vegan'],
-                  ['is_vegetarian', 'Vegetarian'],
-                ] as [keyof FormState, string][]
-              ).map(([key, label]) => (
-                <label key={key} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form[key] as boolean}
-                    onChange={(e) => setField(key, e.target.checked)}
-                    className="w-4 h-4 accent-[var(--accent)]"
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Pickup address */}
-          <div>
-            <label htmlFor="d-addr" className="block text-sm font-medium text-ink mb-1">
-              Pickup address{' '}
-              <span className="text-error" aria-label="required">
-                *
-              </span>
-            </label>
-            <input
-              id="d-addr"
-              type="text"
-              required
-              value={form.pickup_address}
-              onChange={(e) => setField('pickup_address', e.target.value)}
-              className={inputClass}
-              placeholder="Street address, city"
-            />
-          </div>
-
-          {/* Lat / Lng */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="block text-sm font-medium text-ink">
-                Pickup coordinates{' '}
-                <span className="text-error" aria-label="required">*</span>
-              </span>
-              <button
-                type="button"
-                onClick={handleGetCurrentLocation}
-                disabled={geoLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-line text-xs font-medium text-ink-muted hover:bg-surface-soft transition-colors disabled:opacity-50 min-h-[36px]"
-                aria-busy={geoLoading}
-              >
-                {geoLoading ? (
-                  <LoadingSpinner size="sm" label="Getting location" />
-                ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                )}
-                {geoLoading ? 'Detecting…' : 'Use my location'}
-              </button>
-            </div>
-            {geoError && (
-              <p className="text-xs text-error mb-2" role="alert">{geoError}</p>
-            )}
+            {/* Quantity + Unit */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="d-lat" className="block text-xs font-medium text-ink-muted mb-1">
-                  Latitude
+                <label htmlFor="d-qty" className="block text-sm font-medium text-ink mb-1">
+                  Quantity{' '}
+                  <span className="text-error" aria-label="required">
+                    *
+                  </span>
                 </label>
                 <input
-                  id="d-lat"
+                  id="d-qty"
                   type="number"
-                  step="any"
                   required
-                  value={form.pickup_lat}
-                  onChange={(e) => setField('pickup_lat', e.target.value)}
+                  min={1}
+                  value={form.quantity}
+                  onChange={(e) => setField('quantity', e.target.value)}
                   className={inputClass}
-                  placeholder="51.5074"
                   style={{ fontVariantNumeric: 'tabular-nums' }}
                 />
               </div>
               <div>
-                <label htmlFor="d-lng" className="block text-xs font-medium text-ink-muted mb-1">
-                  Longitude
+                <label htmlFor="d-unit" className="block text-sm font-medium text-ink mb-1">
+                  Unit{' '}
+                  <span className="text-error" aria-label="required">
+                    *
+                  </span>
                 </label>
-                <input
-                  id="d-lng"
-                  type="number"
-                  step="any"
-                  required
-                  value={form.pickup_lng}
-                  onChange={(e) => setField('pickup_lng', e.target.value)}
+                <select
+                  id="d-unit"
+                  value={form.quantity_unit}
+                  onChange={(e) => setField('quantity_unit', e.target.value)}
                   className={inputClass}
-                  placeholder="-0.1278"
-                  style={{ fontVariantNumeric: 'tabular-nums' }}
-                />
+                >
+                  {UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-            <p className="mt-1 text-xs text-ink-muted">
-              Click &ldquo;Use my location&rdquo; to fill these automatically, or find them by right-clicking on Google Maps.
-            </p>
+
+            {/* Weight */}
+            <div>
+              <label htmlFor="d-weight" className="block text-sm font-medium text-ink mb-1">
+                Approximate weight (kg)
+              </label>
+              <input
+                id="d-weight"
+                type="number"
+                step="0.1"
+                min={0}
+                value={form.weight_kg}
+                onChange={(e) => setField('weight_kg', e.target.value)}
+                className={inputClass}
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              />
+            </div>
           </div>
 
-          {/* Pickup notes */}
-          <div>
-            <label htmlFor="d-notes" className="block text-sm font-medium text-ink mb-1">
-              Pickup notes
-            </label>
-            <textarea
-              id="d-notes"
-              rows={2}
-              value={form.pickup_notes}
-              onChange={(e) => setField('pickup_notes', e.target.value)}
-              className={cn(inputClass, 'resize-none')}
-              placeholder="e.g. Ring the bell, ask for Maria"
-            />
-          </div>
+          {/* Section 2 — Dietary & allergens */}
+          <FormSection label="Dietary & allergens">
+            {/* Allergens */}
+            <fieldset>
+              <legend className="block text-sm font-medium text-ink mb-3">
+                Allergens present
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {ALLERGENS.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleAllergen(a)}
+                    aria-pressed={allergens.includes(a)}
+                    style={allergenPillStyle(allergens.includes(a))}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
 
-          {/* Expires at */}
-          <div>
-            <label htmlFor="d-expires" className="block text-sm font-medium text-ink mb-1">
-              Available until{' '}
-              <span className="text-error" aria-label="required">
-                *
-              </span>
-            </label>
-            <input
-              id="d-expires"
-              type="datetime-local"
-              required
-              value={form.expires_at}
-              onChange={(e) => setField('expires_at', e.target.value)}
-              className={inputClass}
-            />
-          </div>
+            {/* Dietary toggles */}
+            <fieldset>
+              <legend className="block text-sm font-medium text-ink mb-3">Dietary</legend>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ['is_halal', 'Halal'],
+                    ['is_vegan', 'Vegan'],
+                    ['is_vegetarian', 'Vegetarian'],
+                  ] as [keyof FormState, string][]
+                ).map(([key, label]) => {
+                  const active = form[key] as boolean;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setField(key, !form[key])}
+                      aria-pressed={active}
+                      style={allergenPillStyle(active)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </FormSection>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 min-h-[44px]"
-            aria-busy={loading}
-          >
-            {loading && <LoadingSpinner size="sm" label="Posting donation" />}
-            {loading ? 'Posting…' : 'Post donation'}
-          </button>
+          {/* Section 3 — Where & when */}
+          <FormSection label="Where & when">
+            {/* Pickup address */}
+            <div>
+              <label htmlFor="d-addr" className="block text-sm font-medium text-ink mb-1">
+                Pickup address{' '}
+                <span className="text-error" aria-label="required">
+                  *
+                </span>
+              </label>
+              <input
+                id="d-addr"
+                type="text"
+                required
+                value={form.pickup_address}
+                onChange={(e) => setField('pickup_address', e.target.value)}
+                className={inputClass}
+                placeholder="Street address, city"
+              />
+            </div>
+
+            {/* Pickup coordinates */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="block text-sm font-medium text-ink">
+                  Pickup coordinates{' '}
+                  <span className="text-error" aria-label="required">*</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleGetCurrentLocation}
+                  disabled={geoLoading}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-line text-xs font-medium text-ink-muted hover:bg-surface-soft transition-colors disabled:opacity-50 min-h-[36px]"
+                  aria-busy={geoLoading}
+                >
+                  {geoLoading ? (
+                    <LoadingSpinner size="sm" label="Getting location" />
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                  {geoLoading ? 'Detecting…' : 'Use my location'}
+                </button>
+              </div>
+
+              {geoError && (
+                <p className="text-xs text-error mb-2" role="alert">{geoError}</p>
+              )}
+
+              {/* Coords set success indicator */}
+              {!geoError && form.pickup_lat && !showCoords && (
+                <p className="text-xs text-success mb-2">
+                  Location detected — coordinates saved.
+                </p>
+              )}
+
+              {/* Manual coords link */}
+              {!showCoords && (
+                <button
+                  type="button"
+                  onClick={() => setShowCoords(true)}
+                  className="text-xs text-ink-muted hover:text-ink transition-colors mb-2"
+                >
+                  Enter coordinates manually →
+                </button>
+              )}
+
+              {/* Lat/Lng grid — only shown when showCoords or geoError */}
+              {(showCoords || !!geoError) && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="d-lat" className="block text-xs font-medium text-ink-muted mb-1">
+                        Latitude
+                      </label>
+                      <input
+                        id="d-lat"
+                        type="number"
+                        step="any"
+                        required
+                        value={form.pickup_lat}
+                        onChange={(e) => setField('pickup_lat', e.target.value)}
+                        className={inputClass}
+                        placeholder="51.5074"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="d-lng" className="block text-xs font-medium text-ink-muted mb-1">
+                        Longitude
+                      </label>
+                      <input
+                        id="d-lng"
+                        type="number"
+                        step="any"
+                        required
+                        value={form.pickup_lng}
+                        onChange={(e) => setField('pickup_lng', e.target.value)}
+                        className={inputClass}
+                        placeholder="-0.1278"
+                        style={{ fontVariantNumeric: 'tabular-nums' }}
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Find coordinates by right-clicking on Google Maps.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Pickup notes */}
+            <div>
+              <label htmlFor="d-notes" className="block text-sm font-medium text-ink mb-1">
+                Pickup notes
+              </label>
+              <textarea
+                id="d-notes"
+                rows={2}
+                value={form.pickup_notes}
+                onChange={(e) => setField('pickup_notes', e.target.value)}
+                className={cn(inputClass, 'resize-none')}
+                placeholder="e.g. Ring the bell, ask for Maria"
+              />
+            </div>
+
+            {/* Expires at */}
+            <div>
+              <label htmlFor="d-expires" className="block text-sm font-medium text-ink mb-1">
+                Available until{' '}
+                <span className="text-error" aria-label="required">
+                  *
+                </span>
+              </label>
+              <input
+                id="d-expires"
+                type="datetime-local"
+                required
+                value={form.expires_at}
+                onChange={(e) => setField('expires_at', e.target.value)}
+                className={inputClass}
+              />
+            </div>
+          </FormSection>
+
+          <div style={{ marginBlockStart: 'var(--space-xl)' }}>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 min-h-[44px]"
+              aria-busy={loading}
+            >
+              {loading && <LoadingSpinner size="sm" label="Posting donation" />}
+              {loading ? 'Posting…' : 'Post donation'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

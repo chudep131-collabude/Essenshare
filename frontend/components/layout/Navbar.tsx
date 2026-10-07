@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
 
 const navLinks = [
   { href: '/find',     label: 'Find Food' },
@@ -18,6 +19,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 8);
@@ -75,20 +77,41 @@ export default function Navbar() {
 
         {/* Desktop auth */}
         <div className="hidden md:flex items-center gap-[var(--space-m)]">
-          <Link
-            href="/login"
-            aria-current={pathname === '/login' ? 'page' : undefined}
-            className="text-[var(--step--1)] font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors duration-[var(--dur-fast)]"
-          >
-            Login
-          </Link>
-          <Link
-            href="/register"
-            aria-current={pathname === '/register' ? 'page' : undefined}
-            className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[38px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
-          >
-            Register
-          </Link>
+          {user ? (
+            <>
+              <Link
+                href="/dashboard"
+                aria-current={pathname.startsWith('/dashboard') ? 'page' : undefined}
+                className="text-[var(--step--1)] font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors duration-[var(--dur-fast)]"
+              >
+                Dashboard
+              </Link>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[38px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                aria-current={pathname === '/login' ? 'page' : undefined}
+                className="text-[var(--step--1)] font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors duration-[var(--dur-fast)]"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                aria-current={pathname === '/register' ? 'page' : undefined}
+                className="inline-flex items-center justify-center text-[var(--step--1)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] rounded-pill px-[var(--space-l)] min-h-[38px] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)] active:scale-[0.98]"
+              >
+                Start Donating
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -140,20 +163,41 @@ export default function Navbar() {
               );
             })}
             <li className="pt-[var(--space-s)] flex flex-col gap-[var(--space-s)]">
-              <Link
-                href="/login"
-                onClick={closeMenu}
-                className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
-              >
-                Login
-              </Link>
-              <Link
-                href="/register"
-                onClick={closeMenu}
-                className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)]"
-              >
-                Register
-              </Link>
+              {user ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    onClick={closeMenu}
+                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => { closeMenu(); void logout(); }}
+                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)]"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={closeMenu}
+                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-medium border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--surface-soft)] transition-colors duration-[var(--dur-fast)]"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={closeMenu}
+                    className="block w-full text-center px-[var(--space-l)] py-[var(--space-m)] rounded-pill text-[var(--step-0)] font-semibold bg-[var(--accent)] text-[var(--accent-on)] hover:bg-[var(--accent-dark)] transition-colors duration-[var(--dur-fast)]"
+                  >
+                    Start Donating
+                  </Link>
+                </>
+              )}
             </li>
           </ul>
         </div>

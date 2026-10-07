@@ -4,6 +4,7 @@ import './globals.css';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import CookieNotice from '@/components/layout/CookieNotice';
+import { AuthProvider } from '@/lib/auth-context';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -14,7 +15,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: {
     default: 'Essenshare',
-    template: '%s — Essenshare',
+    template: '%s Essenshare',
   },
   description: 'No good food should become waste while someone nearby is hungry.',
   icons: {
@@ -30,15 +31,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="min-h-screen flex flex-col">
-        <a href="#main-content" className="skip-to-content">
-          Skip to main content
-        </a>
-        <Navbar />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
-        <Footer />
-        <CookieNotice />
+        <AuthProvider>
+          <a href="#main-content" className="skip-to-content">
+            Skip to main content
+          </a>
+          <Navbar />
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+          <Footer />
+          <CookieNotice />
+        </AuthProvider>
       </body>
     </html>
   );

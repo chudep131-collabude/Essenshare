@@ -81,17 +81,18 @@ export default function PickupCodeModal({ donationId, onClose }: PickupCodeModal
     if (donationId) requestPickup();
   }, [donationId, requestPickup]);
 
-  // Focus trap & Escape key
+  // Focus trap & Escape key — runs only when modal opens/closes, not on state transitions
   useEffect(() => {
     if (!donationId) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const focusable = dialog.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    first?.focus();
+    // Capture a non-null reference for use inside the keydown closure
+    const trapTarget: HTMLDivElement = dialog;
+    // Focus the dialog container itself on open so the trap is immediately active.
+    // Tab key handler below manages element-level cycling dynamically (re-queries
+    // each keystroke) so new buttons appearing after loading resolves are captured
+    // without re-running this effect.
+    trapTarget.focus();
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -99,6 +100,12 @@ export default function PickupCodeModal({ donationId, onClose }: PickupCodeModal
         return;
       }
       if (e.key === 'Tab') {
+        // Re-query on every Tab so focusable elements after state changes are included
+        const focusable = trapTarget.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
         if (e.shiftKey) {
           if (document.activeElement === first) {
             e.preventDefault();
@@ -114,7 +121,7 @@ export default function PickupCodeModal({ donationId, onClose }: PickupCodeModal
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [donationId, onClose, state]);
+  }, [donationId, onClose]);
 
   async function handleCancel() {
     if (!pickup) return;

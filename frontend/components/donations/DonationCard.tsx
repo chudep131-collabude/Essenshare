@@ -61,7 +61,7 @@ interface DonationCardProps {
   donation: Donation;
   onRequestPickup?: (donationId: string) => void;
   showCancelButton?: boolean;
-  onCancel?: (donationId: string) => void;
+  onCancel?: (donationId: string) => void | Promise<void>;
 }
 
 export default function DonationCard({
@@ -109,7 +109,7 @@ export default function DonationCard({
     if (!onCancel) return;
     setCancelLoading(true);
     try {
-      onCancel(donation.id);
+      await onCancel(donation.id);
     } finally {
       setCancelLoading(false);
     }

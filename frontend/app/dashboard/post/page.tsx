@@ -48,6 +48,8 @@ export default function PostDonationPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [allergens, setAllergens] = useState<string[]>([]);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({
     title: '',
     description: '',
@@ -70,6 +72,34 @@ export default function PostDonationPage() {
       router.push('/login?next=/dashboard/post');
     }
   }, [user, authLoading, router]);
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setGeoLoading(true);
+    setGeoError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setForm((prev) => ({
+          ...prev,
+          pickup_lat: pos.coords.latitude.toFixed(6),
+          pickup_lng: pos.coords.longitude.toFixed(6),
+        }));
+        setGeoLoading(false);
+      },
+      (err) => {
+        setGeoError(
+          err.code === 1
+            ? 'Location access denied. Please enter coordinates manually.'
+            : 'Could not get your location. Please enter coordinates manually.'
+        );
+        setGeoLoading(false);
+      },
+      { timeout: 10_000 }
+    );
+  }
 
   function setField(key: keyof FormState, value: string | boolean) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -323,49 +353,71 @@ export default function PostDonationPage() {
           </div>
 
           {/* Lat / Lng */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="d-lat" className="block text-sm font-medium text-ink mb-1">
-                Latitude{' '}
-                <span className="text-error" aria-label="required">
-                  *
-                </span>
-              </label>
-              <input
-                id="d-lat"
-                type="number"
-                step="any"
-                required
-                value={form.pickup_lat}
-                onChange={(e) => setField('pickup_lat', e.target.value)}
-                className={inputClass}
-                placeholder="51.5074"
-                style={{ fontVariantNumeric: 'tabular-nums' }}
-              />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="block text-sm font-medium text-ink">
+                Pickup coordinates{' '}
+                <span className="text-error" aria-label="required">*</span>
+              </span>
+              <button
+                type="button"
+                onClick={useCurrentLocation}
+                disabled={geoLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-line text-xs font-medium text-ink-muted hover:bg-surface-soft transition-colors disabled:opacity-50 min-h-[36px]"
+                aria-busy={geoLoading}
+              >
+                {geoLoading ? (
+                  <LoadingSpinner size="sm" label="Getting location" />
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )}
+                {geoLoading ? 'Detecting…' : 'Use my location'}
+              </button>
             </div>
-            <div>
-              <label htmlFor="d-lng" className="block text-sm font-medium text-ink mb-1">
-                Longitude{' '}
-                <span className="text-error" aria-label="required">
-                  *
-                </span>
-              </label>
-              <input
-                id="d-lng"
-                type="number"
-                step="any"
-                required
-                value={form.pickup_lng}
-                onChange={(e) => setField('pickup_lng', e.target.value)}
-                className={inputClass}
-                placeholder="-0.1278"
-                style={{ fontVariantNumeric: 'tabular-nums' }}
-              />
+            {geoError && (
+              <p className="text-xs text-error mb-2" role="alert">{geoError}</p>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="d-lat" className="block text-xs font-medium text-ink-muted mb-1">
+                  Latitude
+                </label>
+                <input
+                  id="d-lat"
+                  type="number"
+                  step="any"
+                  required
+                  value={form.pickup_lat}
+                  onChange={(e) => setField('pickup_lat', e.target.value)}
+                  className={inputClass}
+                  placeholder="51.5074"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                />
+              </div>
+              <div>
+                <label htmlFor="d-lng" className="block text-xs font-medium text-ink-muted mb-1">
+                  Longitude
+                </label>
+                <input
+                  id="d-lng"
+                  type="number"
+                  step="any"
+                  required
+                  value={form.pickup_lng}
+                  onChange={(e) => setField('pickup_lng', e.target.value)}
+                  className={inputClass}
+                  placeholder="-0.1278"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                />
+              </div>
             </div>
+            <p className="mt-1 text-xs text-ink-muted">
+              Click &ldquo;Use my location&rdquo; to fill these automatically, or find them by right-clicking on Google Maps.
+            </p>
           </div>
-          <p className="-mt-4 text-xs text-ink-muted">
-            You can find your coordinates from Google Maps by right-clicking a location.
-          </p>
 
           {/* Pickup notes */}
           <div>

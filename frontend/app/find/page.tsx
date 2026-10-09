@@ -1,12 +1,28 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import gsap from 'gsap';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { apiFetch } from '@/lib/api';
+import { geocodeAddress } from '@/lib/geocode';
 import DonationCard, { Donation } from '@/components/donations/DonationCard';
 import PickupCodeModal from '@/components/donations/PickupCodeModal';
+
+// Leaflet requires window — must be loaded client-side only
+const DonationMap = dynamic(
+  () => import('@/components/map/DonationMap'),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{ height: '420px', borderRadius: 'var(--radius-md)', background: 'var(--skeleton)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: 'var(--step--1)', color: 'var(--ink-quiet)' }}>Loading map…</span>
+      </div>
+    ),
+  }
+);
 
 interface LocationState {
   lat: number | null;
@@ -21,14 +37,13 @@ type SearchState = 'idle' | 'loading' | 'data' | 'empty' | 'error';
 function SkeletonCard() {
   return (
     <div
-      className="bg-surface border border-line rounded-md p-4 space-y-3"
+      style={{
+        height: '200px',
+        borderRadius: 'var(--radius-md)',
+        background: 'var(--skeleton)',
+      }}
       aria-hidden="true"
-    >
-      <div className="skeleton h-5 w-3/4" />
-      <div className="skeleton h-4 w-1/2" />
-      <div className="skeleton h-4 w-full" />
-      <div className="skeleton h-4 w-2/3" />
-    </div>
+    />
   );
 }
 
@@ -41,6 +56,9 @@ export default function FindPage() {
   });
   const [category, setCategory] = useState('');
   const [distance, setDistance] = useState('5');
+  const [addressQuery, setAddressQuery] = useState('');
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
 
   const [searchState, setSearchState] = useState<SearchState>('idle');
   const [donations, setDonations] = useState<Donation[]>([]);
@@ -87,6 +105,25 @@ export default function FindPage() {
     );
   }, []);
 
+  const handleAddressSearch = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addressQuery.trim()) return;
+    setAddressLoading(true);
+    setAddressError(null);
+    try {
+      const result = await geocodeAddress(addressQuery);
+      if (!result) {
+        setAddressError('No results found. Try a different address or postcode.');
+        return;
+      }
+      setLocation({ lat: result.lat, lng: result.lng, error: null, loading: false });
+    } catch {
+      setAddressError('Could not search that address. Please try again.');
+    } finally {
+      setAddressLoading(false);
+    }
+  }, [addressQuery]);
+
   // Core fetch accepts explicit page number to avoid stale closure
   const runFetch = useCallback(
     async (lat: number, lng: number, targetPage: number, append: boolean) => {
@@ -99,7 +136,7 @@ export default function FindPage() {
           page: String(targetPage),
           limit: '20',
         });
-        // FIX 1: category state now holds uppercase enum values directly
+        // category state holds uppercase enum values directly
         if (category) {
           params.set('category', category);
         }
@@ -195,33 +232,93 @@ export default function FindPage() {
   const resultsHeading = location.lat ? 'Nearby Donations' : 'Recently Listed';
 
   return (
-    <div className="max-w-page mx-auto px-[var(--space-page)] py-section">
-      <h1
-        className="text-step-2 font-bold text-ink mb-2"
-        style={{ letterSpacing: '-0.02em' }}
+    <div>
+      {/* ─── Full-bleed hero ──────────────────────────────────────────── */}
+      <div
+        style={{
+          position: 'relative',
+          height: 'clamp(280px, 38vh, 420px)',
+          overflow: 'hidden',
+        }}
       >
-        Find Food Near You
-      </h1>
-      <p className="text-ink-muted mb-8 max-w-prose" style={{ textWrap: 'pretty' } as React.CSSProperties}>
-        See what is available within walking distance right now. No account needed. No means test.
-        Open to everyone, always free.
-      </p>
-
-      {/* Location controls */}
-      <div className="bg-surface border border-line rounded-md p-6 mb-8">
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        {/* Background image */}
+        <Image
+          src="/web/pexels-julia-m-cameron-6994943.jpg"
+          alt=""
+          fill
+          priority
+          style={{ objectFit: 'cover', objectPosition: 'center 40%' }}
+          aria-hidden="true"
+        />
+        {/* Dark gradient scrim */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(to bottom, oklch(0% 0 0 / 0.02) 0%, oklch(0% 0 0 / 0.55) 65%, oklch(0% 0 0 / 0.82) 100%)',
+          }}
+          aria-hidden="true"
+        />
+        {/* Text + CTA overlaid at bottom */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: 'var(--space-2xl) var(--space-page)',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: 'var(--display)',
+              fontWeight: 800,
+              color: '#fff',
+              lineHeight: 1,
+              letterSpacing: '-0.03em',
+              textWrap: 'balance',
+              marginBottom: 'var(--space-s)',
+            } as React.CSSProperties}
+          >
+            Find food near you.
+          </h1>
+          <p
+            style={{
+              fontSize: 'var(--step-0)',
+              color: 'rgba(255,255,255,0.75)',
+              marginBottom: 'var(--space-l)',
+              textWrap: 'pretty',
+            } as React.CSSProperties}
+          >
+            Available now. No account needed. Always free.
+          </p>
           <button
             type="button"
             onClick={requestLocation}
             disabled={location.loading}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 min-h-[44px]"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.6rem 1.5rem',
+              borderRadius: 'var(--radius-pill)',
+              background: 'var(--accent)',
+              color: 'var(--accent-on)',
+              fontWeight: 700,
+              fontSize: 'var(--step-0)',
+              border: 'none',
+              cursor: 'pointer',
+              minHeight: '44px',
+            }}
             aria-busy={location.loading}
           >
             {location.loading ? (
               <LoadingSpinner size="sm" label="Getting location" />
             ) : (
               <svg
-                className="w-4 h-4"
+                width="18"
+                height="18"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -244,195 +341,398 @@ export default function FindPage() {
             Use My Location
           </button>
         </div>
+      </div>
 
-        {location.error && (
-          <Alert type="warning" className="mb-4">
-            {location.error}
-          </Alert>
-        )}
+      {/* ─── Sticky filter bar ───────────────────────────────────────── */}
+      <div
+        style={{
+          position: 'sticky',
+          top: '64px',
+          zIndex: 10,
+          background: 'var(--bg)',
+          borderBottom: '1px solid var(--line)',
+          padding: 'var(--space-l) var(--space-page)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-s)',
+            overflowX: 'auto',
+            paddingBottom: '2px',
+          }}
+        >
+          {[
+            { value: '', label: 'All' },
+            { value: 'GROCERIES', label: 'Groceries' },
+            { value: 'BAKERY', label: 'Bakery' },
+            { value: 'PRODUCE', label: 'Produce' },
+            { value: 'PREPARED_FOOD', label: 'Prepared Meals' },
+            { value: 'DAIRY', label: 'Dairy' },
+            { value: 'OTHER', label: 'Other' },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setCategory(value)}
+              style={{
+                border: `1.5px solid ${category === value ? 'var(--ink)' : 'var(--line)'}`,
+                borderRadius: 'var(--radius-pill)',
+                padding: '0.4rem 1rem',
+                fontSize: 'var(--step--1)',
+                fontWeight: 500,
+                background: category === value ? 'var(--ink)' : 'transparent',
+                color: category === value ? 'var(--surface)' : 'var(--ink)',
+                whiteSpace: 'nowrap',
+                minHeight: '36px',
+                cursor: 'pointer',
+                flexShrink: 0,
+                transition:
+                  'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)',
+              }}
+              aria-pressed={category === value}
+            >
+              {label}
+            </button>
+          ))}
 
-        {location.lat && location.lng && searchState !== 'idle' && (
-          <Alert type="success" className="mb-4">
-            Location found — searching within {distance} km…
-          </Alert>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <label
-              htmlFor="category-filter"
-              className="block text-xs font-medium text-ink-muted mb-1"
-            >
-              Category
-            </label>
-            {/* FIX 1: option values are uppercase enum strings */}
-            <select
-              id="category-filter"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">All categories</option>
-              <option value="GROCERIES">Groceries</option>
-              <option value="BAKERY">Bakery &amp; Café</option>
-              <option value="PRODUCE">Fresh Produce</option>
-              <option value="PREPARED_FOOD">Prepared Meals</option>
-              <option value="DAIRY">Dairy</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-
-          <div className="flex-1">
-            <label
-              htmlFor="distance-filter"
-              className="block text-xs font-medium text-ink-muted mb-1"
-            >
-              Distance
-            </label>
-            <select
-              id="distance-filter"
-              value={distance}
-              onChange={(e) => setDistance(e.target.value)}
-              className={inputClass}
-            >
-              <option value="1">Within 1 km</option>
-              <option value="2">Within 2 km</option>
-              <option value="5">Within 5 km</option>
-              <option value="10">Within 10 km</option>
-              <option value="25">Within 25 km</option>
-            </select>
-          </div>
+          {/* Distance select at end */}
+          <select
+            id="distance-filter"
+            value={distance}
+            onChange={(e) => setDistance(e.target.value)}
+            style={{
+              marginLeft: 'auto',
+              flexShrink: 0,
+              border: '1.5px solid var(--line)',
+              borderRadius: 'var(--radius-pill)',
+              padding: '0.4rem 1rem',
+              fontSize: 'var(--step--1)',
+              fontWeight: 500,
+              background: 'var(--surface)',
+              color: 'var(--ink)',
+              minHeight: '36px',
+              cursor: 'pointer',
+              outline: 'none',
+              appearance: 'none',
+              paddingRight: '2rem',
+            }}
+          >
+            <option value="1">1 km</option>
+            <option value="2">2 km</option>
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+            <option value="25">25 km</option>
+          </select>
         </div>
       </div>
 
-      {/* Results area */}
-      <section aria-labelledby="results-heading">
-        <h2
-          id="results-heading"
-          className="text-step-1 font-semibold text-ink mb-4"
-          style={{ letterSpacing: '-0.02em' }}
+      {/* ─── Address fallback — only when GPS denied ─────────────────── */}
+      {location.error && (
+        <div
+          style={{
+            padding: 'var(--space-m) var(--space-page)',
+            background: 'var(--surface-soft)',
+            borderBottom: '1px solid var(--line)',
+          }}
         >
-          {resultsHeading}
-        </h2>
-
-        {/* Idle prompt to share location */}
-        {searchState === 'idle' && (
-          <div className="py-16 text-center border border-dashed border-line rounded-md">
-            <svg
-              className="w-10 h-10 text-ink-muted mx-auto mb-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <p className="text-ink-muted text-sm">
-              Share your location to see what&apos;s available nearby.
-            </p>
-          </div>
-        )}
-
-        {/* Loading 3 skeleton cards */}
-        {searchState === 'loading' && (
-          <div className="space-y-4" aria-label="Loading results" aria-busy="true">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        )}
-
-        {/* Data real results */}
-        {searchState === 'data' && donations.length > 0 && (
-          <div className="space-y-4" ref={resultsRef}>
-            {donations.map((donation) => (
-              <DonationCard
-                key={donation.id}
-                donation={donation}
-                onRequestPickup={(id, trigger) => {
-                  if (trigger) pickupTriggerRef.current = trigger;
-                  setPickupTarget(id);
-                }}
-              />
-            ))}
-            {hasMore && (
-              <div className="pt-4 text-center">
-                <button
-                  type="button"
-                  onClick={handleLoadMore}
-                  className="inline-flex items-center justify-center px-6 py-2.5 rounded-md border border-line text-sm font-medium text-ink hover:bg-surface-soft transition-colors min-h-[44px]"
-                >
-                  Load more
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Empty */}
-        {searchState === 'empty' && (
-          <div className="py-16 text-center border border-dashed border-line rounded-md">
-            <svg
-              className="w-10 h-10 text-ink-muted mx-auto mb-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-ink font-medium mb-1">Nothing available nearby right now.</p>
-            <p className="text-ink-muted text-sm mb-4">
-              Try expanding the distance or checking back later.
-            </p>
+          <Alert type="warning" className="mb-3">
+            {location.error}
+          </Alert>
+          <form onSubmit={handleAddressSearch} style={{ display: 'flex', gap: 'var(--space-s)' }}>
+            <label htmlFor="address-search" className="sr-only">
+              Enter a city, postcode or address
+            </label>
+            <input
+              id="address-search"
+              type="text"
+              value={addressQuery}
+              onChange={(e) => setAddressQuery(e.target.value)}
+              placeholder="Enter a city, postcode or address…"
+              className={inputClass}
+              style={{ flex: 1 }}
+            />
             <button
-              type="button"
-              onClick={() => setDistance('25')}
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-md border border-line text-sm font-medium text-ink hover:bg-surface-soft transition-colors min-h-[44px]"
+              type="submit"
+              disabled={addressLoading || !addressQuery.trim()}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] shrink-0"
+              aria-busy={addressLoading}
             >
-              Expand to 25 km
+              {addressLoading ? <LoadingSpinner size="sm" label="Searching" /> : 'Search'}
             </button>
+          </form>
+          {addressError && (
+            <p className="mt-2 text-xs text-error" role="alert">
+              {addressError}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ─── Content area ────────────────────────────────────────────── */}
+      <div
+        className="max-w-page mx-auto"
+        style={{ padding: 'var(--space-xl) var(--space-page)' }}
+      >
+        {/* Map — shows when there are donations with coordinates */}
+        {searchState === 'data' && donations.some((d) => d.pickup_lat != null) && (
+          <div style={{ marginBottom: 'var(--space-xl)' }}>
+            <DonationMap
+              donations={donations}
+              userLat={location.lat}
+              userLng={location.lng}
+              onSelectDonation={(id) => setPickupTarget(id)}
+              height="420px"
+            />
           </div>
         )}
 
-        {/* Error */}
-        {searchState === 'error' && (
-          <div className="py-12 text-center">
-            <Alert type="error" className="mb-4 text-left">
-              Could not load results. Please check your connection and try again.
-            </Alert>
-            <button
-              type="button"
-              onClick={() => {
-                setRetryKey((k) => k + 1);
-                if (location.lat && location.lng) {
-                  runFetch(location.lat, location.lng, page, false);
-                }
+        {/* Results area */}
+        <section aria-labelledby="results-heading">
+          <h2
+            id="results-heading"
+            style={{
+              fontSize: 'var(--step-0)',
+              fontWeight: 600,
+              color: 'var(--ink-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              marginBottom: 'var(--space-l)',
+            }}
+          >
+            {resultsHeading}
+          </h2>
+
+          {/* Idle prompt to share location */}
+          {searchState === 'idle' && (
+            <div
+              style={{
+                background: 'var(--surface-soft)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-3xl) var(--space-page)',
+                textAlign: 'center',
               }}
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors min-h-[44px]"
             >
-              Try again
-            </button>
-          </div>
-        )}
-      </section>
+              {/* Simple SVG bowl illustration in accent colour */}
+              <svg
+                width="56"
+                height="56"
+                viewBox="0 0 56 56"
+                fill="none"
+                style={{ margin: '0 auto var(--space-l)' }}
+                aria-hidden="true"
+              >
+                <circle
+                  cx="28"
+                  cy="28"
+                  r="20"
+                  stroke="var(--accent)"
+                  strokeWidth="2.5"
+                  fill="var(--accent-muted)"
+                />
+                <path
+                  d="M18 28 h20"
+                  stroke="var(--accent)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M21 23 h14"
+                  stroke="var(--accent)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M22 33 h12"
+                  stroke="var(--accent)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <p
+                style={{
+                  fontSize: 'var(--step-2)',
+                  fontWeight: 700,
+                  color: 'var(--ink)',
+                  marginBottom: 'var(--space-s)',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Nothing near you yet
+              </p>
+              <p
+                style={{
+                  fontSize: 'var(--step-0)',
+                  color: 'var(--ink-muted)',
+                  marginBottom: 'var(--space-xl)',
+                  maxWidth: '40ch',
+                  margin: '0 auto var(--space-xl)',
+                }}
+              >
+                Share your location to see what&apos;s available nearby — or search by city.
+              </p>
+              <button
+                type="button"
+                onClick={requestLocation}
+                disabled={location.loading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.6rem 1.5rem',
+                  borderRadius: 'var(--radius-pill)',
+                  background: 'var(--accent)',
+                  color: 'var(--accent-on)',
+                  fontWeight: 700,
+                  fontSize: 'var(--step-0)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                }}
+                aria-busy={location.loading}
+              >
+                Use My Location
+              </button>
+            </div>
+          )}
+
+          {/* Loading skeleton — two-column grid matching data layout */}
+          {searchState === 'loading' && (
+            <div
+              className="grid md:grid-cols-2"
+              style={{ gap: 'var(--space-l)' }}
+              aria-label="Loading results"
+              aria-busy="true"
+            >
+              {[...Array(4)].map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          )}
+
+          {/* Data — two-column grid */}
+          {searchState === 'data' && donations.length > 0 && (
+            <div
+              className="grid md:grid-cols-2"
+              style={{ gap: 'var(--space-l)' }}
+              ref={resultsRef}
+            >
+              {donations.map((donation) => (
+                <DonationCard
+                  key={donation.id}
+                  donation={donation}
+                  onRequestPickup={(id, trigger) => {
+                    if (trigger) pickupTriggerRef.current = trigger;
+                    setPickupTarget(id);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Load more below the grid */}
+          {searchState === 'data' && hasMore && (
+            <div style={{ paddingTop: 'var(--space-xl)', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={handleLoadMore}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0.6rem 1.5rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1.5px solid var(--line)',
+                  background: 'transparent',
+                  color: 'var(--ink)',
+                  fontWeight: 500,
+                  fontSize: 'var(--step-0)',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                }}
+              >
+                Load more
+              </button>
+            </div>
+          )}
+
+          {/* Empty */}
+          {searchState === 'empty' && (
+            <div
+              style={{
+                background: 'var(--surface-soft)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 'var(--space-3xl) var(--space-page)',
+                textAlign: 'center',
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 'var(--step-2)',
+                  fontWeight: 700,
+                  color: 'var(--ink)',
+                  marginBottom: 'var(--space-s)',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Nothing here right now.
+              </p>
+              <p
+                style={{
+                  fontSize: 'var(--step-0)',
+                  color: 'var(--ink-muted)',
+                  marginBottom: 'var(--space-xl)',
+                  maxWidth: '40ch',
+                  margin: '0 auto var(--space-xl)',
+                }}
+              >
+                Check back later, or expand your search radius.
+              </p>
+              <button
+                type="button"
+                onClick={() => setDistance('25')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.6rem 1.5rem',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1.5px solid var(--line)',
+                  background: 'transparent',
+                  color: 'var(--ink)',
+                  fontWeight: 500,
+                  fontSize: 'var(--step-0)',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                }}
+              >
+                Expand to 25 km
+              </button>
+            </div>
+          )}
+
+          {/* Error */}
+          {searchState === 'error' && (
+            <div className="py-12 text-center">
+              <Alert type="error" className="mb-4 text-left">
+                Could not load results. Please check your connection and try again.
+              </Alert>
+              <button
+                type="button"
+                onClick={() => {
+                  setRetryKey((k) => k + 1);
+                  if (location.lat && location.lng) {
+                    runFetch(location.lat, location.lng, page, false);
+                  }
+                }}
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors min-h-[44px]"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
 
       {/* Pickup code modal */}
       <PickupCodeModal

@@ -141,23 +141,84 @@ export default function DonationCard({
   return (
     <article
       aria-label={donation.title}
-      className="bg-surface border border-line rounded-md overflow-hidden hover:shadow-md transition-shadow"
       style={{
-        borderBlockStart: `4px solid ${categoryColor}`,
-        transition: 'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+        position: 'relative',
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderRadius: 'var(--radius-md)',
+        overflow: 'hidden',
+        borderTop: `4px solid ${categoryColor}`,
+        transition:
+          'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+        (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.transform = '';
+        (e.currentTarget as HTMLElement).style.boxShadow = '';
       }}
     >
-      <div className="px-5 pt-4 pb-5 space-y-2">
-        {/* Row 1 — category eyebrow + distance */}
-        <div className="flex items-center justify-between gap-2">
+      <div style={{ padding: 'var(--space-l)' }}>
+        {/* Urgent expiry badge — absolute, top-right, only < 4 hours */}
+        {(() => {
+          const msLeft = new Date(donation.expires_at).getTime() - Date.now();
+          if (msLeft > 0 && msLeft < 4 * 60 * 60 * 1000) {
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'var(--space-m)',
+                  right: 'var(--space-m)',
+                  fontSize: 'var(--step--1)',
+                  fontWeight: 600,
+                  color: getExpiryColour(donation.expires_at),
+                  background: 'var(--surface)',
+                  border: `1.5px solid ${getExpiryColour(donation.expires_at)}`,
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '0.2rem 0.6rem',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+                aria-label={`Expires in ${timeRemaining}`}
+              >
+                {timeRemaining}
+              </div>
+            );
+          }
+          return null;
+        })()}
+
+        {/* Eyebrow row — category + distance */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-s)',
+            marginBottom: 'var(--space-xs)',
+          }}
+        >
           <span
-            className="text-xs font-semibold uppercase"
-            style={{ letterSpacing: '0.08em', color: categoryColor }}
+            style={{
+              fontSize: 'var(--step--1)',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: categoryColor,
+            }}
           >
             {CATEGORY_LABELS[donation.category] ?? donation.category}
           </span>
           {donation.distance_km !== undefined && (
-            <span className="text-xs text-ink-quiet" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <span
+              style={{
+                fontSize: 'var(--step--1)',
+                color: 'var(--ink-quiet)',
+                fontVariantNumeric: 'tabular-nums',
+                flexShrink: 0,
+              }}
+            >
               {donation.distance_km < 1
                 ? `${Math.round(donation.distance_km * 1000)} m`
                 : `${donation.distance_km.toFixed(1)} km`}
@@ -165,36 +226,71 @@ export default function DonationCard({
           )}
         </div>
 
-        {/* Row 2 — title */}
+        {/* Title */}
         <h3
-          className="text-step-1 font-bold text-ink leading-snug"
-          style={{ letterSpacing: '-0.02em', textWrap: 'balance' } as React.CSSProperties}
+          style={{
+            fontSize: 'var(--step-1)',
+            fontWeight: 700,
+            color: 'var(--ink)',
+            lineHeight: 1.2,
+            letterSpacing: '-0.02em',
+            textWrap: 'balance',
+            marginBottom: 'var(--space-xs)',
+          } as React.CSSProperties}
         >
           {donation.title}
         </h3>
 
-        {/* Row 3 — quantity + expiry */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <span className="text-ink-muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {/* Description — 1 line truncated */}
+        {donation.description && (
+          <p
+            style={{
+              fontSize: 'var(--step--1)',
+              color: 'var(--ink-muted)',
+              marginBottom: 'var(--space-xs)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {donation.description}
+          </p>
+        )}
+
+        {/* Meta row — quantity · address */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-xs)',
+            fontSize: 'var(--step--1)',
+            color: 'var(--ink-muted)',
+            marginBottom: 'var(--space-xs)',
+            fontVariantNumeric: 'tabular-nums',
+            overflow: 'hidden',
+          }}
+        >
+          <span>
             {donation.quantity} {donation.quantity_unit}
           </span>
+          <span aria-hidden="true">·</span>
           <span
-            className="font-medium"
-            style={{ color: getExpiryColour(donation.expires_at), fontVariantNumeric: 'tabular-nums' }}
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
           >
-            {timeRemaining}
+            {donation.pickup_address}
           </span>
         </div>
 
-        {/* Row 4 — address */}
-        <p className="text-sm text-ink-muted truncate">{donation.pickup_address}</p>
-
-        {/* Row 5 — dietary + allergen chips */}
+        {/* Dietary + allergen chips */}
         {(donation.is_halal ||
           donation.is_vegan ||
           donation.is_vegetarian ||
           displayedAllergens.length > 0) && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5" style={{ marginBottom: 'var(--space-xs)' }}>
             {donation.is_halal && <span className={chipClass}>Halal</span>}
             {donation.is_vegan && <span className={chipClass}>Vegan</span>}
             {donation.is_vegetarian && <span className={chipClass}>Vegetarian</span>}
@@ -214,39 +310,85 @@ export default function DonationCard({
           </div>
         )}
 
-        {/* Row 6 — action row */}
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <div className="flex gap-2 flex-wrap">
-            {onRequestPickup && !isExpired && (
-              <button
-                type="button"
-                onClick={(e) => onRequestPickup(donation.id, e.currentTarget)}
-                aria-label={`Get pickup code for ${donation.title}`}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-md bg-accent text-[var(--accent-on)] font-semibold text-sm hover:bg-accent-dark transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 min-h-[44px]"
-              >
-                Get Pickup Code
-              </button>
-            )}
-            {showCancelButton && onCancel && (
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={cancelLoading}
-                aria-label={`Cancel listing: ${donation.title}`}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-line text-sm font-medium text-ink-muted hover:bg-surface-soft transition-colors disabled:opacity-50 min-h-[44px]"
-              >
-                {cancelLoading ? <LoadingSpinner size="sm" label="Cancelling" /> : null}
-                Cancel listing
-              </button>
-            )}
-          </div>
+        {/* Action row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-s)',
+            paddingTop: 'var(--space-m)',
+          }}
+        >
+          {/* Primary action */}
+          {onRequestPickup && !isExpired && !showCancelButton && (
+            <button
+              type="button"
+              onClick={(e) => onRequestPickup(donation.id, e.currentTarget)}
+              aria-label={`Get pickup code for ${donation.title}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1.25rem',
+                borderRadius: 'var(--radius-pill)',
+                background: 'var(--accent)',
+                color: 'var(--accent-on)',
+                fontWeight: 700,
+                fontSize: 'var(--step-0)',
+                border: 'none',
+                cursor: 'pointer',
+                minHeight: '44px',
+                flex: 1,
+                justifyContent: 'center',
+              }}
+            >
+              Get Pickup Code <span aria-hidden="true">→</span>
+            </button>
+          )}
 
-          {/* Report button — far right */}
+          {showCancelButton && onCancel && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelLoading}
+              aria-label={`Cancel listing: ${donation.title}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1.25rem',
+                borderRadius: 'var(--radius-pill)',
+                color: 'var(--error)',
+                border: '1.5px solid color-mix(in oklch, var(--error) 30%, transparent)',
+                background: 'transparent',
+                fontWeight: 600,
+                fontSize: 'var(--step-0)',
+                cursor: 'pointer',
+                minHeight: '44px',
+                opacity: cancelLoading ? 0.5 : 1,
+              }}
+            >
+              {cancelLoading ? <LoadingSpinner size="sm" label="Cancelling" /> : null}
+              Cancel listing
+            </button>
+          )}
+
+          {/* Report button far right */}
           {reportStatus !== 'success' && (
             <button
               type="button"
               onClick={() => setReportOpen((v) => !v)}
-              className="text-xs text-ink-quiet hover:text-ink-muted transition-colors"
+              style={{
+                fontSize: 'var(--step--1)',
+                color: 'var(--ink-quiet)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                flexShrink: 0,
+                padding: '0.4rem',
+              }}
               aria-expanded={reportOpen}
               aria-controls={`report-form-${donation.id}`}
             >
@@ -254,7 +396,7 @@ export default function DonationCard({
             </button>
           )}
           {reportStatus === 'success' && (
-            <p className="text-xs text-ink-muted">Reported</p>
+            <p style={{ fontSize: 'var(--step--1)', color: 'var(--ink-muted)' }}>Reported</p>
           )}
         </div>
 

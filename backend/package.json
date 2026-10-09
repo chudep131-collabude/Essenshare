@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "db:migrate": "node src/config/migrate.js",
-    "db:rollback": "echo db:rollback placeholder"
+    "db:rollback": "echo db:rollback placeholder",
+    "db:seed": "node src/config/seed.js"
   },
   "engines": {
     "node": ">=18.0.0"

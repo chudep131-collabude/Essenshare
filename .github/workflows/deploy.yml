@@ -1,0 +1,29 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{secrets.DEPLOY_HOST}}
+          username: ${{secrets.DEPLOY_USER}}
+          key: ${{secrets.DEPLOY_SSH_KEY}}
+          script: |
+            cd /var/www/essenshare
+            git pull origin main
+            cd backend && npm ci --omit=dev
+            node src/config/migrate.js
+            pm2 reload essenshare-api
+            cd ../frontend && npm ci
+            npm run build
+            pm2 reload essenshare-frontend 2>/dev/null || true
+            curl -f http://localhost:3001/health || exit 1

@@ -52,7 +52,7 @@ async function runSeeds() {
         await client.query(sql);
         console.log(`[seed] Done: ${filename}`);
       } catch (err) {
-        // Log filename and error message — never log SQL or user data
+        // Log filename and error message never log SQL or user data
         console.error(`[seed] FAILED: ${filename} ${err.message}`);
         throw err;
       }

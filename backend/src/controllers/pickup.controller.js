@@ -22,16 +22,25 @@ function getCookie(req, name) {
   return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
 }
 
+function getSessionToken(req) {
+  return (
+    req.headers['x-session-token'] ||
+    getCookie(req, 'recipient_session')
+  );
+}
+
 // ── Joi schemas (exported for use with validateBody middleware) ───────────────
 
 const requestPickupSchema = Joi.object({
   donation_id: Joi.string().uuid().required(),
   requested_qty: Joi.number().integer().min(1).max(100).default(1),
+  liability_accepted: Joi.boolean().default(true),
 });
 
 const verifyCodeSchema = Joi.object({
-  code: Joi.string().min(8).max(64).required(),
-});
+  code: Joi.string().min(6).max(64).optional(),
+  raw_code: Joi.string().min(6).max(64).optional(),
+}).or('code', 'raw_code');
 
 const confirmPickupSchema = Joi.object({
   confirmed_qty: Joi.number().integer().min(1).required(),
@@ -42,12 +51,12 @@ const confirmPickupSchema = Joi.object({
 
 /**
  * POST /api/v1/pickups/request
- * Public — requires a valid recipient_session cookie.
+ * Public requires a valid recipient_session cookie or x-session-token header.
  * Body is validated by validateBody(requestPickupSchema) at the route level.
  */
 async function requestPickup(req, res, next) {
   try {
-    const sessionToken = getCookie(req, 'recipient_session');
+    const sessionToken = getSessionToken(req);
     const result = await pickupService.requestPickup(req.body, sessionToken, req.ip);
     return created(res, result, 'Pickup request created');
   } catch (err) {
@@ -62,7 +71,8 @@ async function requestPickup(req, res, next) {
  */
 async function verifyCode(req, res, next) {
   try {
-    const result = await pickupService.verifyCode(req.body.code, req.user.sub, req.ip);
+    const code = req.body.code || req.body.raw_code;
+    const result = await pickupService.verifyCode(code, req.user.sub, req.ip);
     return success(res, result);
   } catch (err) {
     return next(err);
@@ -90,12 +100,12 @@ async function confirmPickup(req, res, next) {
 
 /**
  * DELETE /api/v1/pickups/:id
- * Public — requires a valid recipient_session cookie.
+ * Public requires a valid recipient_session cookie or x-session-token header.
  * Cancels a PENDING pickup and restores the reserved quantity.
  */
 async function cancelPickup(req, res, next) {
   try {
-    const sessionToken = getCookie(req, 'recipient_session');
+    const sessionToken = getSessionToken(req);
     await pickupService.cancelPickup(req.params.id, sessionToken, req.ip);
     return res.status(204).end();
   } catch (err) {
@@ -105,12 +115,12 @@ async function cancelPickup(req, res, next) {
 
 /**
  * GET /api/v1/pickups/:id/status
- * Public — requires a valid recipient_session cookie.
+ * Public requires a valid recipient_session cookie or x-session-token header.
  * Returns current status fields for the pickup.
  */
 async function getPickupStatus(req, res, next) {
   try {
-    const sessionToken = getCookie(req, 'recipient_session');
+    const sessionToken = getSessionToken(req);
     const result = await pickupService.getPickupStatus(req.params.id, sessionToken);
     return success(res, result);
   } catch (err) {

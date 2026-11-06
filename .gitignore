@@ -2,7 +2,7 @@
 node_modules/
 backend/node_modules/
 
-# Environment files — NEVER commit these
+# Environment files NEVER commit these
 .env
 .env.*
 !.env.example

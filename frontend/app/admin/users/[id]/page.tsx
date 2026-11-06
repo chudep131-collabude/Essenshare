@@ -5,9 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { apiFetch, ApiException } from '@/lib/api';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Alert from '@/components/ui/Alert';
 import Badge from '@/components/ui/Badge';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface AdminUserDetail {
   id: string;
@@ -15,20 +17,19 @@ interface AdminUserDetail {
   role: string;
   status: string;
   full_name: string | null;
+  phone: string | null;
+  country_code: string | null;
+  email_verified: boolean;
   created_at: string;
-  donation_count?: number;
-  report_count?: number;
+  updated_at: string;
+  donation_count: number;
+  report_count: number;
 }
 
-function RoleBadge({ role }: { role: string }) {
-  switch (role) {
-    case 'ADMIN': return <Badge variant="primary">Admin</Badge>;
-    case 'INDIVIDUAL_DONOR': return <Badge variant="default">Individual</Badge>;
-    case 'BUSINESS_DONOR': return <Badge variant="default">Business</Badge>;
-    case 'ORGANIZATION': return <Badge variant="default">Organisation</Badge>;
-    default: return <Badge variant="default">{role}</Badge>;
-  }
-}
+const STATUS_OPTIONS = ['ACTIVE', 'SUSPENDED', 'BANNED'] as const;
+type StatusOption = (typeof STATUS_OPTIONS)[number];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function StatusChip({ status }: { status: string }) {
   const styles: Record<string, { bg: string; color: string }> = {
@@ -36,80 +37,101 @@ function StatusChip({ status }: { status: string }) {
     SUSPENDED: { bg: 'var(--warning-bg)', color: 'var(--warning)' },
     DELETED:   { bg: 'var(--error-bg)',   color: 'var(--error)' },
     PENDING:   { bg: 'var(--info-bg)',    color: 'var(--info)' },
-    BANNED:    { bg: 'var(--error-bg)',   color: 'var(--error)' },
+    PENDING_APPROVAL: { bg: 'var(--info-bg)', color: 'var(--info)' },
   };
   const s = styles[status] ?? { bg: 'var(--surface-soft)', color: 'var(--ink-muted)' };
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '3px 10px',
-        borderRadius: 'var(--radius-pill)',
-        fontSize: 'var(--step--1)',
-        fontWeight: 500,
-        background: s.bg,
-        color: s.color,
-      }}
-    >
+    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: 'var(--step--1)', fontWeight: 600, background: s.bg, color: s.color }}>
       {status}
     </span>
   );
 }
 
+function ProfileRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 'var(--space-m)', padding: 'var(--space-m) 0', borderBottom: '1px solid var(--line-subtle)' }}>
+      <span style={{ fontSize: 'var(--step--1)', color: 'var(--ink-muted)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em', paddingTop: '2px' }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 'var(--step-0)', color: 'var(--ink)' }}>
+        {value ?? <span style={{ color: 'var(--ink-quiet)' }}>—</span>}
+      </span>
+    </div>
+  );
+}
+
+function StatTile({ label, value, colour }: { label: string; value: number; colour?: string }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', padding: 'var(--space-l) var(--space-xl)' }}>
+      <p style={{ fontSize: 'var(--step--1)', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500, marginBottom: 'var(--space-xs)' }}>
+        {label}
+      </p>
+      <p style={{ fontSize: 'var(--step-3)', fontWeight: 700, color: colour ?? 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>
+        {value.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AdminUserDetailPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
-  const userId = params.id as string;
+  const userId = typeof params.id === 'string' ? params.id : '';
 
-  const [userData, setUserData] = useState<AdminUserDetail | null>(null);
+  const [profile, setProfile] = useState<AdminUserDetail | null>(null);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const [newStatus, setNewStatus] = useState('');
+  // Status update form
+  const [newStatus, setNewStatus] = useState<StatusOption>('ACTIVE');
   const [reason, setReason] = useState('');
-  const [updating, setUpdating] = useState(false);
-  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
+  const [showBanConfirm, setShowBanConfirm] = useState(false);
 
   // Auth guard
   useEffect(() => {
-    if (!loading && !user) router.push('/login');
-    if (!loading && user && user.role !== 'ADMIN') router.push('/');
-  }, [user, loading, router]);
+    if (!authLoading && !user) router.push('/login');
+    if (!authLoading && user && user.role !== 'ADMIN') router.push('/');
+  }, [user, authLoading, router]);
 
+  // Fetch profile
   useEffect(() => {
-    if (!loading && user && user.role === 'ADMIN' && userId) {
-      (async () => {
-        setFetchLoading(true);
-        setFetchError(null);
-        try {
-          const envelope = await apiFetch<AdminUserDetail>(`/admin/users/${userId}`);
-          setUserData(envelope.data);
-          if (envelope.data) setNewStatus(envelope.data.status);
-        } catch (err) {
-          setFetchError(err instanceof ApiException ? err.message : 'Failed to load user.');
-        } finally {
-          setFetchLoading(false);
+    if (!userId || authLoading || !user || user.role !== 'ADMIN') return;
+    (async () => {
+      setFetchLoading(true);
+      setFetchError(null);
+      try {
+        const envelope = await apiFetch<AdminUserDetail>(`/admin/users/${userId}`);
+        if (envelope.data) {
+          setProfile(envelope.data);
+          // Pre-select current status (never pre-select BANNED/DELETED)
+          const cur = envelope.data.status;
+          if (cur === 'ACTIVE' || cur === 'SUSPENDED') setNewStatus(cur);
         }
-      })();
-    }
-  }, [loading, user, userId]);
+      } catch (err) {
+        setFetchError(err instanceof ApiException ? err.message : 'Failed to load user.');
+      } finally {
+        setFetchLoading(false);
+      }
+    })();
+  }, [userId, authLoading, user]);
 
-  const handleUpdateStatus = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleStatusUpdate() {
     if (!reason.trim()) {
-      setUpdateError('Reason is required.');
+      setUpdateError('Please provide a reason.');
       return;
     }
-    if (newStatus === 'BANNED') {
-      const confirmed = window.confirm(
-        `Are you sure you want to BAN this user? This action will mark them as permanently removed.`
-      );
-      if (!confirmed) return;
+    if (newStatus === 'BANNED' && !showBanConfirm) {
+      setShowBanConfirm(true);
+      return;
     }
-    setUpdating(true);
+    setShowBanConfirm(false);
+    setUpdateLoading(true);
     setUpdateError(null);
     setUpdateSuccess(null);
     try {
@@ -117,17 +139,19 @@ export default function AdminUserDetailPage() {
         method: 'PATCH',
         body: JSON.stringify({ status: newStatus, reason: reason.trim() }),
       });
-      setUpdateSuccess(`Status updated to ${newStatus} successfully.`);
-      setUserData((prev) => prev ? { ...prev, status: newStatus } : prev);
+      setUpdateSuccess(`Status updated to ${newStatus}.`);
       setReason('');
+      // Refresh profile
+      const envelope = await apiFetch<AdminUserDetail>(`/admin/users/${userId}`);
+      if (envelope.data) setProfile(envelope.data);
     } catch (err) {
       setUpdateError(err instanceof ApiException ? err.message : 'Failed to update status.');
     } finally {
-      setUpdating(false);
+      setUpdateLoading(false);
     }
-  };
+  }
 
-  if (loading || !user || user.role !== 'ADMIN') {
+  if (authLoading || !user || user.role !== 'ADMIN') {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <LoadingSpinner size="lg" />
@@ -137,256 +161,186 @@ export default function AdminUserDetailPage() {
 
   if (fetchLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-2xl)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  if (fetchError) {
+  if (fetchError || !profile) {
     return (
       <div>
-        <Link
-          href="/admin/users"
-          style={{ color: 'var(--accent)', textDecoration: 'none', fontSize: 'var(--step-0)', display: 'inline-block', marginBottom: 'var(--space-l)' }}
-        >
-          ← Back to Users
+        <Link href="/admin/users" style={{ fontSize: 'var(--step--1)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-xs)', textDecoration: 'none', marginBottom: 'var(--space-l)' }}>
+          ← Back to users
         </Link>
-        <Alert type="error">{fetchError}</Alert>
+        <Alert type="error">{fetchError ?? 'User not found.'}</Alert>
       </div>
     );
   }
 
-  if (!userData) return null;
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: 'var(--step--1)',
-    fontWeight: 600,
-    color: 'var(--ink-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    marginBottom: 'var(--space-2xs)',
-    display: 'block',
-  };
-
-  const fieldStyle: React.CSSProperties = {
-    fontSize: 'var(--step-0)',
-    color: 'var(--ink)',
-    fontWeight: 500,
+  const roleLabel: Record<string, string> = {
+    INDIVIDUAL_DONOR: 'Individual Donor',
+    BUSINESS_DONOR: 'Business Donor',
+    ORGANIZATION: 'Organisation',
+    ADMIN: 'Admin',
   };
 
   return (
-    <div style={{ maxWidth: '720px' }}>
-      <Link
-        href="/admin/users"
-        style={{
-          color: 'var(--accent)',
-          textDecoration: 'none',
-          fontSize: 'var(--step-0)',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 'var(--space-2xs)',
-          marginBottom: 'var(--space-l)',
-        }}
-      >
-        ← Back to Users
+    <div>
+      {/* Back link */}
+      <Link href="/admin/users" style={{ fontSize: 'var(--step--1)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-xs)', textDecoration: 'none', marginBottom: 'var(--space-xl)' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+        Back to users
       </Link>
 
-      <h1
-        style={{
-          fontSize: 'var(--step-3)',
-          fontWeight: 700,
-          color: 'var(--ink)',
-          marginBlockEnd: 'var(--space-xl)',
-          letterSpacing: '-0.02em',
-        }}
-      >
-        User Detail
-      </h1>
-
-      {/* Profile card */}
-      <div
-        style={{
-          background: 'var(--surface)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--line)',
-          boxShadow: 'var(--shadow-sm)',
-          padding: 'var(--space-xl)',
-          marginBottom: 'var(--space-xl)',
-        }}
-      >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: 'var(--space-l)',
-          }}
-        >
-          <div>
-            <span style={labelStyle}>Full Name</span>
-            <span style={fieldStyle}>{userData.full_name ?? '—'}</span>
+      {/* Page heading */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-l)', flexWrap: 'wrap', marginBottom: 'var(--space-2xl)' }}>
+        <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--accent-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} aria-hidden="true">
+          <span style={{ fontSize: 'var(--step-1)', fontWeight: 700, color: 'var(--accent)' }}>
+            {(profile.full_name ?? profile.email).charAt(0).toUpperCase()}
+          </span>
+        </div>
+        <div>
+          <h1 style={{ fontSize: 'var(--step-2)', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink)', marginBottom: '4px' }}>
+            {profile.full_name ?? profile.email}
+          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)', flexWrap: 'wrap' }}>
+            <Badge variant={profile.role === 'ADMIN' ? 'primary' : 'default'}>
+              {roleLabel[profile.role] ?? profile.role}
+            </Badge>
+            <StatusChip status={profile.status} />
           </div>
-          <div>
-            <span style={labelStyle}>Email</span>
-            <span style={fieldStyle}>{userData.email}</span>
-          </div>
-          <div>
-            <span style={labelStyle}>Role</span>
-            <div style={{ marginTop: 'var(--space-2xs)' }}>
-              <RoleBadge role={userData.role} />
-            </div>
-          </div>
-          <div>
-            <span style={labelStyle}>Status</span>
-            <div style={{ marginTop: 'var(--space-2xs)' }}>
-              <StatusChip status={userData.status} />
-            </div>
-          </div>
-          <div>
-            <span style={labelStyle}>Joined</span>
-            <span style={{ ...fieldStyle, fontVariantNumeric: 'tabular-nums' }}>
-              {new Date(userData.created_at).toLocaleDateString('en-GB', {
-                year: 'numeric', month: 'long', day: 'numeric',
-              })}
-            </span>
-          </div>
-          <div>
-            <span style={labelStyle}>User ID</span>
-            <span style={{ ...fieldStyle, fontSize: 'var(--step--1)', fontFamily: 'monospace', color: 'var(--ink-muted)' }}>
-              {userData.id}
-            </span>
-          </div>
-          {userData.donation_count !== undefined && (
-            <div>
-              <span style={labelStyle}>Donations</span>
-              <span style={{ ...fieldStyle, fontVariantNumeric: 'tabular-nums' }}>
-                {userData.donation_count}
-              </span>
-            </div>
-          )}
-          {userData.report_count !== undefined && (
-            <div>
-              <span style={labelStyle}>Reports</span>
-              <span style={{ ...fieldStyle, fontVariantNumeric: 'tabular-nums' }}>
-                {userData.report_count}
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Actions panel */}
-      <div
-        style={{
-          background: 'var(--surface)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--line)',
-          boxShadow: 'var(--shadow-sm)',
-          padding: 'var(--space-xl)',
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 'var(--step-1)',
-            fontWeight: 700,
-            color: 'var(--ink)',
-            marginBottom: 'var(--space-l)',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Update Status
-        </h2>
+      {/* Stats row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 'var(--space-m)', marginBottom: 'var(--space-2xl)' }}>
+        <StatTile label="Donations" value={profile.donation_count} />
+        <StatTile label="Reports received" value={profile.report_count} colour={profile.report_count > 0 ? 'var(--warning)' : 'var(--accent)'} />
+      </div>
 
-        {updateSuccess && (
-          <div style={{ marginBottom: 'var(--space-m)' }}>
-            <Alert type="success">{updateSuccess}</Alert>
-          </div>
-        )}
-        {updateError && (
-          <div style={{ marginBottom: 'var(--space-m)' }}>
-            <Alert type="error">{updateError}</Alert>
-          </div>
-        )}
+      <div style={{ display: 'grid', gap: 'var(--space-2xl)', alignItems: 'start' }} className="grid-cols-1 lg:grid-cols-2">
 
-        <form onSubmit={handleUpdateStatus} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-m)' }}>
-          <div>
-            <label
-              htmlFor="status-select"
-              style={{ ...labelStyle, marginBottom: 'var(--space-xs)' }}
-            >
-              New Status
-            </label>
-            <select
-              id="status-select"
-              value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value)}
-              style={{
-                width: '100%',
-                padding: 'var(--space-xs) var(--space-s)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--line-strong)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 'var(--step-0)',
-              }}
-            >
-              <option value="ACTIVE">Active</option>
-              <option value="SUSPENDED">Suspended</option>
-              <option value="BANNED">Banned</option>
-            </select>
+        {/* Profile details */}
+        <section aria-labelledby="profile-heading">
+          <h2 id="profile-heading" style={{ fontSize: 'var(--step-1)', fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em', marginBottom: 'var(--space-m)' }}>
+            Profile
+          </h2>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', padding: 'var(--space-l) var(--space-xl)' }}>
+            <ProfileRow label="Full name" value={profile.full_name} />
+            <ProfileRow label="Email" value={profile.email} />
+            <ProfileRow label="Phone" value={profile.phone} />
+            <ProfileRow label="Country" value={profile.country_code} />
+            <ProfileRow label="Email verified" value={
+              <span style={{ color: profile.email_verified ? 'var(--success)' : 'var(--warning)', fontWeight: 500 }}>
+                {profile.email_verified ? 'Verified' : 'Not verified'}
+              </span>
+            } />
+            <ProfileRow label="Joined" value={new Date(profile.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })} />
+            <ProfileRow label="Last updated" value={new Date(profile.updated_at).toLocaleDateString()} />
+            <ProfileRow label="User ID" value={
+              <span style={{ fontFamily: 'monospace', fontSize: 'var(--step--1)', color: 'var(--ink-muted)' }}>
+                {profile.id}
+              </span>
+            } />
           </div>
+        </section>
 
-          <div>
-            <label
-              htmlFor="reason-textarea"
-              style={{ ...labelStyle, marginBottom: 'var(--space-xs)' }}
-            >
-              Reason <span aria-label="required" style={{ color: 'var(--error)' }}>*</span>
-            </label>
-            <textarea
-              id="reason-textarea"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              required
-              rows={3}
-              placeholder="Explain the reason for this status change…"
-              aria-required="true"
-              style={{
-                width: '100%',
-                padding: 'var(--space-xs) var(--space-s)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--line-strong)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 'var(--step-0)',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                lineHeight: 1.5,
-              }}
-            />
-          </div>
+        {/* Status update */}
+        <section aria-labelledby="status-heading">
+          <h2 id="status-heading" style={{ fontSize: 'var(--step-1)', fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em', marginBottom: 'var(--space-m)' }}>
+            Update Status
+          </h2>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', padding: 'var(--space-xl)' }}>
 
-          <div>
-            <button
-              type="submit"
-              disabled={updating}
-              style={{
-                padding: 'var(--space-xs) var(--space-xl)',
-                borderRadius: 'var(--radius-pill)',
-                border: 'none',
-                background: 'var(--accent)',
-                color: 'var(--accent-on)',
-                fontSize: 'var(--step-0)',
-                fontWeight: 600,
-                cursor: updating ? 'not-allowed' : 'pointer',
-                opacity: updating ? 0.7 : 1,
-                minHeight: '44px',
-              }}
-            >
-              {updating ? 'Updating…' : 'Update Status'}
-            </button>
+            {updateSuccess && (
+              <Alert type="success" className="mb-4">
+                {updateSuccess}
+              </Alert>
+            )}
+            {updateError && (
+              <Alert type="error" className="mb-4">
+                {updateError}
+              </Alert>
+            )}
+
+            <div style={{ marginBottom: 'var(--space-l)' }}>
+              <label htmlFor="new-status" style={{ display: 'block', fontSize: 'var(--step--1)', fontWeight: 500, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 'var(--space-xs)' }}>
+                New status
+              </label>
+              <select
+                id="new-status"
+                value={newStatus}
+                onChange={(e) => { setNewStatus(e.target.value as StatusOption); setShowBanConfirm(false); }}
+                style={{ width: '100%', padding: 'var(--space-s) var(--space-m)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: 'var(--step-0)' }}
+              >
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-l)' }}>
+              <label htmlFor="status-reason" style={{ display: 'block', fontSize: 'var(--step--1)', fontWeight: 500, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 'var(--space-xs)' }}>
+                Reason <span style={{ color: 'var(--error)' }}>*</span>
+              </label>
+              <textarea
+                id="status-reason"
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Reason for status change…"
+                style={{ width: '100%', padding: 'var(--space-s) var(--space-m)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: 'var(--step-0)', resize: 'vertical' }}
+              />
+            </div>
+
+            {/* Ban confirmation */}
+            {showBanConfirm && (
+              <Alert type="error" className="mb-4">
+                <strong>Permanent action.</strong> Banning this user soft-deletes their account and hides all their donations. This cannot be undone from the UI. Click &quot;Confirm ban&quot; to proceed.
+              </Alert>
+            )}
+
+            <div style={{ display: 'flex', gap: 'var(--space-s)' }}>
+              {showBanConfirm ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleStatusUpdate}
+                    disabled={updateLoading}
+                    style={{ flex: 1, padding: 'var(--space-s) var(--space-m)', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--error)', color: '#fff', fontWeight: 600, fontSize: 'var(--step-0)', cursor: updateLoading ? 'not-allowed' : 'pointer', opacity: updateLoading ? 0.7 : 1, minHeight: '44px' }}
+                  >
+                    {updateLoading ? 'Banning…' : 'Confirm ban'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowBanConfirm(false)}
+                    style={{ padding: 'var(--space-s) var(--space-m)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontWeight: 500, fontSize: 'var(--step-0)', cursor: 'pointer', minHeight: '44px' }}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStatusUpdate}
+                  disabled={updateLoading || !reason.trim()}
+                  style={{ padding: 'var(--space-s) var(--space-xl)', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--accent)', color: 'var(--accent-on)', fontWeight: 600, fontSize: 'var(--step-0)', cursor: (updateLoading || !reason.trim()) ? 'not-allowed' : 'pointer', opacity: (updateLoading || !reason.trim()) ? 0.5 : 1, minHeight: '44px', display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}
+                >
+                  {updateLoading && <LoadingSpinner size="sm" label="Updating" />}
+                  {updateLoading ? 'Updating…' : 'Update status'}
+                </button>
+              )}
+            </div>
+
+            <p style={{ marginTop: 'var(--space-m)', fontSize: 'var(--step--1)', color: 'var(--ink-quiet)' }}>
+              Status changes are logged in the audit trail.
+            </p>
           </div>
-        </form>
+        </section>
+
       </div>
     </div>
   );

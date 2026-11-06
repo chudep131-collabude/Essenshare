@@ -1,6 +1,6 @@
 -- 001_seed_dev.sql
 -- Development seed data. Safe to run multiple times (idempotent).
--- DO NOT run in production — use 002_seed_admin.sql instead.
+-- DO NOT run in production use 002_seed_admin.sql instead.
 
 BEGIN;
 
@@ -52,7 +52,7 @@ VALUES
   (
     (SELECT id FROM users WHERE email = 'business@example.com'),
     'Freshly Baked Sourdough Loaves',
-    'End-of-day sourdough bread — still fresh, perfect for families.',
+    'End-of-day sourdough bread still fresh, perfect for families.',
     'BAKERY',
     120,
     'items',

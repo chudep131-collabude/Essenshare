@@ -1,6 +1,6 @@
 /**
  * routes/reports.routes.js
- * Safety report routes — Phase 4 implementation.
+ * Safety report routes Phase 4 implementation.
  * POST / is intentionally unauthenticated (anonymous reports allowed).
  * Middleware order: authenticateToken → requireRole → validateBody/validateQuery → handler.
  */
@@ -18,14 +18,14 @@ const {
   resolveReportSchema,
 } = require('../controllers/report.controller');
 
-// POST /api/v1/reports — public (anonymous reports allowed)
+// POST /api/v1/reports public (anonymous reports allowed)
 router.post(
   '/',
   validateBody(submitReportSchema),
   submitReport
 );
 
-// GET /api/v1/reports — ADMIN only
+// GET /api/v1/reports ADMIN only
 router.get(
   '/',
   authenticateToken,
@@ -34,7 +34,7 @@ router.get(
   listReports
 );
 
-// PATCH /api/v1/reports/:id/resolve — ADMIN only
+// PATCH /api/v1/reports/:id/resolve ADMIN only
 router.patch(
   '/:id/resolve',
   authenticateToken,

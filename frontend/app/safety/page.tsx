@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
+import SafetyReportCard from '@/components/safety/SafetyReportCard';
 
 export const metadata: Metadata = {
   title: 'Food Safety Policy',
   description:
-    'Essenshare food safety policy — what donors must agree to, what is prohibited, and how to report unsafe donations.',
+    'Essenshare food safety policy what donors must agree to, what is prohibited, and how to report unsafe donations.',
 };
 
 export default function SafetyPage() {
@@ -11,7 +12,7 @@ export default function SafetyPage() {
     <article className="max-w-page mx-auto px-[var(--space-page)] py-section">
       <div className="prose max-w-prose mx-auto">
         <h1 id="top">Food Safety Policy</h1>
-        <p className="text-ink-quiet text-sm">Version 1.0 — October 2026</p>
+        <p className="text-ink-quiet text-sm">Version 1.0 October 2026</p>
 
         {/* Purpose */}
         <section aria-labelledby="purpose-heading">
@@ -52,8 +53,8 @@ export default function SafetyPage() {
                 or prohibited from distribution.
               </li>
               <li>
-                The information I provide about my donation — including descriptions, quantities,
-                allergens, storage requirements, and use-by dates — is accurate to the best of my
+                The information I provide about my donation including descriptions, quantities,
+                allergens, storage requirements, and use-by dates is accurate to the best of my
                 knowledge.
               </li>
               <li>
@@ -140,7 +141,7 @@ export default function SafetyPage() {
         <section aria-labelledby="reporting-heading">
           <h2 id="reporting-heading">Reporting an Unsafe Donation</h2>
           <p>
-            Anyone — recipient, donor, or visitor — can submit a safety report. No account required.
+            Anyone recipient, donor, or visitor can submit a safety report. No account required.
           </p>
           <p>Report categories:</p>
           <ul>
@@ -176,23 +177,10 @@ export default function SafetyPage() {
         <section aria-labelledby="report-heading">
           <h2 id="report-heading">Report an Unsafe Donation</h2>
           <p>
-            Use the button below to report a safety concern. Your report is anonymous and helps keep
+            Use the form below to report a safety concern. Your report is anonymous and helps keep
             the community safe.
           </p>
-          <div className="not-prose">
-            <button
-              type="button"
-              disabled
-              title="Coming in Phase 10"
-              aria-describedby="report-btn-hint"
-              className="px-6 py-3 rounded-md bg-error text-[var(--accent-on)] font-semibold text-sm opacity-50 cursor-not-allowed"
-            >
-              Report Unsafe Donation
-            </button>
-            <p id="report-btn-hint" className="mt-2 text-xs text-ink-muted">
-              Coming in Phase 10
-            </p>
-          </div>
+          <SafetyReportCard />
         </section>
       </div>
     </article>

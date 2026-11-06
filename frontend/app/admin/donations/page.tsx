@@ -91,6 +91,7 @@ export default function AdminDonationsPage() {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -124,11 +125,12 @@ export default function AdminDonationsPage() {
   const handleHide = async (donationId: string) => {
     if (!window.confirm('Hide this donation?')) return;
     setActionLoadingId(donationId);
+    setActionError(null);
     try {
       await apiPost(`/admin/donations/${donationId}/hide`, { reason: 'Admin review' });
       await fetchDonations();
     } catch (err) {
-      alert(err instanceof ApiException ? err.message : 'Failed to hide donation.');
+      setActionError(err instanceof ApiException ? err.message : 'Failed to hide donation.');
     } finally {
       setActionLoadingId(null);
     }
@@ -137,11 +139,12 @@ export default function AdminDonationsPage() {
   const handleReinstate = async (donationId: string) => {
     if (!window.confirm('Reinstate this donation?')) return;
     setActionLoadingId(donationId);
+    setActionError(null);
     try {
       await apiPost(`/admin/donations/${donationId}/reinstate`, {});
       await fetchDonations();
     } catch (err) {
-      alert(err instanceof ApiException ? err.message : 'Failed to reinstate donation.');
+      setActionError(err instanceof ApiException ? err.message : 'Failed to reinstate donation.');
     } finally {
       setActionLoadingId(null);
     }
@@ -266,6 +269,11 @@ export default function AdminDonationsPage() {
       {error && (
         <div style={{ marginBottom: 'var(--space-l)' }}>
           <Alert type="error">{error}</Alert>
+        </div>
+      )}
+      {actionError && (
+        <div style={{ marginBottom: 'var(--space-l)' }}>
+          <Alert type="error">{actionError}</Alert>
         </div>
       )}
 

@@ -1,7 +1,7 @@
 /**
  * middleware/security.js
  * Applies Helmet with a strong CSP and additional security headers.
- * All security middleware runs in every environment — never skipped.
+ * All security middleware runs in every environment never skipped.
  */
 
 'use strict';
@@ -27,7 +27,7 @@ const helmetMiddleware = helmet({
   noSniff: true,
   // X-Frame-Options: DENY
   frameguard: { action: 'deny' },
-  // HSTS — only in production
+  // HSTS only in production
   hsts: config.isProd
     ? {
         maxAge: 31536000, // 1 year
@@ -44,7 +44,7 @@ const helmetMiddleware = helmet({
 });
 
 /**
- * securityMiddleware — array of middleware to spread into app.use().
+ * securityMiddleware array of middleware to spread into app.use().
  * Exported as array so additional security handlers can be appended.
  */
 const securityMiddleware = [helmetMiddleware];

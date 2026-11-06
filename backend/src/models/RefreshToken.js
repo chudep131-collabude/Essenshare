@@ -1,7 +1,7 @@
 /**
  * models/RefreshToken.js
  * Data-access methods for the refresh_tokens table.
- * Only SHA-256 hashes of raw tokens are stored — never the raw value.
+ * Only SHA-256 hashes of raw tokens are stored never the raw value.
  * All queries use parameterised placeholders.
  */
 

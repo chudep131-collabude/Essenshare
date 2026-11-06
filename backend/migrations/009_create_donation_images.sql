@@ -1,6 +1,6 @@
 -- 009_create_donation_images.sql
 -- Optional images attached to a donation (up to 4 per listing).
--- Stores URL references only — binary storage is handled externally.
+-- Stores URL references only binary storage is handled externally.
 
 CREATE TABLE IF NOT EXISTS donation_images (
   id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -32,17 +32,27 @@ function globalErrorHandler(err, req, res, next) {
   // Sanitise error context before logging
   const safeBody = maskPII(req.body || {});
 
-  logger.error('Unhandled error', {
-    message: err.message,
-    name: err.name,
-    method: req.method,
-    url: req.originalUrl,
-    // Log sanitised body never raw body
-    body: safeBody,
-    statusCode: err.statusCode || 500,
-    // Stack only in dev logs
-    stack: config.isDev ? err.stack : undefined,
-  });
+  const isClientError = err.statusCode && err.statusCode >= 400 && err.statusCode < 500;
+  if (isClientError) {
+    logger.warn('Client request error', {
+      message: err.message,
+      name: err.name,
+      method: req.method,
+      url: req.originalUrl,
+      body: safeBody,
+      statusCode: err.statusCode,
+    });
+  } else {
+    logger.error('Unhandled server error', {
+      message: err.message,
+      name: err.name,
+      method: req.method,
+      url: req.originalUrl,
+      body: safeBody,
+      statusCode: err.statusCode || 500,
+      stack: config.isDev ? err.stack : undefined,
+    });
+  }
 
   // Joi validation errors
   if (err.name === 'ValidationError' && err.isJoi) {
@@ -71,9 +81,9 @@ function globalErrorHandler(err, req, res, next) {
     });
   }
 
-  // Generic server error no stack in production
+  // Generic server error — clean message for clients, stack is logged to server logger
   const message = config.isDev
-    ? `${err.message}${err.stack ? `\n${err.stack}` : ''}`
+    ? (err.message || 'Internal server error')
     : 'Internal server error';
 
   return serverError(res, message);

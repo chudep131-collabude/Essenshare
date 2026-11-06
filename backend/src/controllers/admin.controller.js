@@ -18,7 +18,7 @@ const DONATION_STATUSES = ['ACTIVE', 'RESERVED', 'COMPLETED', 'EXPIRED', 'CANCEL
 
 const listUsersQuerySchema = Joi.object({
   role:   Joi.string().valid(...USER_ROLES).optional(),
-  status: Joi.string().valid('ACTIVE', 'SUSPENDED', 'DELETED').optional(),
+  status: Joi.string().valid('ACTIVE', 'SUSPENDED', 'DELETED', 'PENDING', 'BANNED').optional(),
   search: Joi.string().max(100).optional(),
   page:   Joi.number().integer().min(1).default(1),
   limit:  Joi.number().integer().min(1).max(100).default(20),
@@ -138,6 +138,112 @@ async function getAuditLogs(req, res, next) {
   }
 }
 
+async function listVerificationQueue(req, res, next) {
+  try {
+    const result = await adminService.listVerificationQueue(req.query);
+    return success(res, result, 'Verification queue retrieved.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function reviewVerificationRequest(req, res, next) {
+  try {
+    const result = await adminService.reviewVerificationRequest(
+      req.params.id,
+      req.body,
+      req.user.sub,
+      req.ip
+    );
+    return success(res, result, 'Verification request reviewed.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function listOrganizations(req, res, next) {
+  try {
+    const result = await adminService.listOrganizations(req.query);
+    return success(res, result, 'Organizations retrieved.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function approveOrganization(req, res, next) {
+  try {
+    const result = await adminService.approveOrganization(
+      req.params.id,
+      req.body,
+      req.user.sub,
+      req.ip
+    );
+    return success(res, result, 'Organization approved.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function rejectOrganization(req, res, next) {
+  try {
+    const result = await adminService.rejectOrganization(
+      req.params.id,
+      req.body,
+      req.user.sub,
+      req.ip
+    );
+    return success(res, result, 'Organization rejected.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function removeDonation(req, res, next) {
+  try {
+    const result = await adminService.removeDonation(
+      req.params.id,
+      req.body,
+      req.user.sub,
+      req.ip
+    );
+    return success(res, result, 'Donation removed.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function warnDonor(req, res, next) {
+  try {
+    const result = await adminService.warnDonor(
+      req.params.id,
+      req.body,
+      req.user.sub,
+      req.ip
+    );
+    return success(res, result, 'Donor warning issued.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+const reviewVerificationSchema = Joi.object({
+  status: Joi.string().valid('APPROVED', 'REJECTED').required(),
+  notes: Joi.string().max(1000).allow('', null).optional(),
+});
+
+const reviewOrgSchema = Joi.object({
+  reason: Joi.string().max(500).optional(),
+  notes: Joi.string().max(1000).optional(),
+});
+
+const removeDonationSchema = Joi.object({
+  reason: Joi.string().max(500).required(),
+});
+
+const warnDonorSchema = Joi.object({
+  reason: Joi.string().max(500).required(),
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -147,10 +253,21 @@ module.exports = {
   hideDonation,
   reinstateDonation,
   getAuditLogs,
-  // Schemas — consumed by route files
+  listVerificationQueue,
+  reviewVerificationRequest,
+  listOrganizations,
+  approveOrganization,
+  rejectOrganization,
+  removeDonation,
+  warnDonor,
+  // Schemas consumed by route files
   listUsersQuerySchema,
   updateUserStatusSchema,
   listDonationsQuerySchema,
   hideDonationSchema,
   listAuditLogsQuerySchema,
+  reviewVerificationSchema,
+  reviewOrgSchema,
+  removeDonationSchema,
+  warnDonorSchema,
 };

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { apiPost, ApiException } from '@/lib/api';
+import { friendlyError } from '@/lib/errors';
 
 const inputClass =
   'w-full px-4 py-2.5 rounded-md border border-line text-sm text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-accent';
@@ -12,6 +13,9 @@ const inputClass =
 function VerifyContent() {
   const searchParams = useSearchParams();
   const uid = searchParams.get('uid') ?? '';
+  const urlDevOtp = searchParams.get('dev_otp') ?? '';
+
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [otp, setOtp] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [resendStatus, setResendStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
@@ -19,11 +23,24 @@ function VerifyContent() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Check search params or sessionStorage for local dev code
+    let code = urlDevOtp;
+    if (!code && typeof window !== 'undefined') {
+      code = (uid ? sessionStorage.getItem(`dev_otp_${uid}`) : null) || sessionStorage.getItem('dev_otp_latest') || '';
+    }
+    if (code) {
+      setDevCode(code);
+      setOtp(code);
+    }
     inputRef.current?.focus();
-  }, []);
+  }, [uid, urlDevOtp]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!uid) {
+      setErrorMsg('Missing verification account ID. Please sign in or register to receive a fresh verification link.');
+      return;
+    }
     if (otp.length !== 6) {
       setErrorMsg('Please enter the 6-digit code.');
       return;
@@ -35,19 +52,32 @@ function VerifyContent() {
       setStatus('success');
     } catch (err) {
       setStatus('error');
-      setErrorMsg(
-        err instanceof ApiException ? err.message : 'Verification failed. Please try again.'
-      );
+      setErrorMsg(friendlyError(err, 'Verification failed. Please try again.'));
     }
   }
 
   async function handleResend() {
-    setResendStatus('loading');
-    try {
-      await apiPost('/auth/resend-verification', { user_id: uid });
-      setResendStatus('sent');
-    } catch {
+    if (!uid) {
       setResendStatus('error');
+      setErrorMsg('Missing account identifier. Please sign in or register to get a verification code.');
+      return;
+    }
+    setResendStatus('loading');
+    setErrorMsg(null);
+    try {
+      const res = await apiPost<{ dev_otp?: string }>('/auth/resend-verification', { user_id: uid });
+      if (res.data?.dev_otp) {
+        setDevCode(res.data.dev_otp);
+        setOtp(res.data.dev_otp);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`dev_otp_${uid}`, res.data.dev_otp);
+          sessionStorage.setItem('dev_otp_latest', res.data.dev_otp);
+        }
+      }
+      setResendStatus('sent');
+    } catch (err) {
+      setResendStatus('error');
+      setErrorMsg(friendlyError(err, 'Could not send the code. Check your connection and try again.'));
     }
   }
 
@@ -66,6 +96,44 @@ function VerifyContent() {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {errorMsg && <Alert type="error">{errorMsg}</Alert>}
+
+      {/* Local testing helper banner */}
+      {devCode ? (
+        <div className="p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 font-semibold text-emerald-800 dark:text-emerald-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Local Testing Mode
+            </div>
+            <p className="text-ink-muted text-xs">
+              Your verification code: <strong className="font-mono text-ink text-sm tracking-widest">{devCode}</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOtp(devCode);
+              inputRef.current?.focus();
+            }}
+            className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shrink-0"
+          >
+            Auto-fill Code
+          </button>
+        </div>
+      ) : uid ? (
+        <div className="p-3 rounded-lg border border-dashed border-line bg-surface-raised text-xs flex items-center justify-between gap-2">
+          <span className="text-ink-muted">Testing locally without SMTP email?</span>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resendStatus === 'loading'}
+            className="font-semibold text-accent hover:underline shrink-0"
+          >
+            {resendStatus === 'loading' ? 'Generating…' : 'Get Test Code'}
+          </button>
+        </div>
+      ) : null}
+
       <div>
         <label htmlFor="otp" className="block text-sm font-medium text-ink mb-1">
           Verification code
@@ -100,20 +168,17 @@ function VerifyContent() {
         <button
           type="button"
           onClick={handleResend}
-          disabled={resendStatus === 'loading' || resendStatus === 'sent'}
+          disabled={resendStatus === 'loading'}
           className="text-sm text-accent hover:text-accent-dark disabled:opacity-50"
         >
           {resendStatus === 'loading'
             ? 'Sending…'
             : resendStatus === 'sent'
-              ? 'Code resent!'
-              : 'Resend code'}
+              ? 'Code refreshed — see test banner'
+              : resendStatus === 'error'
+                ? 'Try again'
+                : 'Resend code'}
         </button>
-        {resendStatus === 'error' && (
-          <p className="text-xs text-error mt-1" role="alert">
-            Could not resend. Try again.
-          </p>
-        )}
       </div>
     </form>
   );

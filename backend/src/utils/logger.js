@@ -28,7 +28,7 @@ const PII_FIELDS = [
 ];
 
 /**
- * maskPII — recursively replaces PII fields in an object with '[REDACTED]'.
+ * maskPII recursively replaces PII fields in an object with '[REDACTED]'.
  * Returns a sanitized shallow copy; does not mutate the original.
  * @param {object} obj
  * @returns {object}

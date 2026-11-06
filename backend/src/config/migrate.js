@@ -1,6 +1,6 @@
 /**
  * config/migrate.js
- * Migration runner — reads all .sql files from backend/migrations/ sorted by
+ * Migration runner reads all .sql files from backend/migrations/ sorted by
  * numeric prefix, executes each inside a transaction, and records which files
  * have been applied in a schema_migrations table.
  *
@@ -86,8 +86,8 @@ async function run() {
         console.log(`[migrate] Applied: ${filename}`);
       } catch (err) {
         await client.query('ROLLBACK');
-        // Log filename and error message — never log SQL or user data
-        console.error(`[migrate] FAILED: ${filename} — ${err.message}`);
+        // Log filename and error message never log SQL or user data
+        console.error(`[migrate] FAILED: ${filename} ${err.message}`);
         throw err;
       }
     }

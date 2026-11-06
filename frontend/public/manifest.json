@@ -1,0 +1,48 @@
+{
+  "name": "EssenShare — Food Redistribution Platform",
+  "short_name": "EssenShare",
+  "description": "Connect surplus food from businesses and donors with local communities. Dignity-first, zero paperwork, anonymous collection.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0f1d",
+  "theme_color": "#0f766e",
+  "categories": ["food", "lifestyle", "social", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Find Food Near Me",
+      "short_name": "Find Food",
+      "description": "View live surplus donations and community pickup points",
+      "url": "/find",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Post Surplus Food",
+      "short_name": "Donate",
+      "description": "List surplus food for immediate community pickup",
+      "url": "/dashboard/post",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

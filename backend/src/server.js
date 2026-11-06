@@ -13,12 +13,13 @@
 
 // ── [1] ENV must be loaded before anything else ───────────────────────────────
 const config = require('./config/env');
-console.log('[1] ENV loaded — NODE_ENV:', config.env, '| PORT:', config.port);
+console.log('[1] ENV loaded NODE_ENV:', config.env, '| PORT:', config.port);
 
 // ── [2] Logger ────────────────────────────────────────────────────────────────
 const { logger } = require('./utils/logger');
-console.log('[2] Logger initialized — level:', config.logging.level);
+console.log('[2] Logger initialized level:', config.logging.level);
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const morgan = require('morgan');
@@ -29,11 +30,11 @@ console.log('[3] Security middleware loaded (Helmet + CSP + HSTS in prod)');
 
 // ── [4] Rate limiters ─────────────────────────────────────────────────────────
 const { generalLimiter } = require('./middleware/rateLimit');
-console.log('[4] Rate limiter loaded — 100 req/15min general');
+console.log('[4] Rate limiter loaded 100 req/15min general');
 
 // ── [5] CORS ──────────────────────────────────────────────────────────────────
 const { corsMiddleware } = require('./middleware/cors');
-console.log('[5] CORS configured — origin:', config.isProd ? config.app.url : '*');
+console.log('[5] CORS configured origin:', config.isProd ? config.app.url : 'Dynamic dev origins (credentials enabled)');
 
 // ── [6] Routes ────────────────────────────────────────────────────────────────
 const centralRouter = require('./routes/index');
@@ -45,16 +46,16 @@ const { notFoundHandler, globalErrorHandler } = require('./middleware/errorHandl
 // ── Build Express app ─────────────────────────────────────────────────────────
 const app = express();
 
-// Security headers — runs in every environment
+// Security headers runs in every environment
 app.use(...securityMiddleware);
+
+// CORS must come before rate limiting to allow preflight checks and ensure CORS headers on 429
+app.use(corsMiddleware);
 
 // Rate limiting
 app.use(generalLimiter);
 
-// CORS
-app.use(corsMiddleware);
-
-// Body parsers — limit JSON to 10 KB to prevent large payload attacks
+// Body parsers limit JSON to 10 KB to prevent large payload attacks
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
@@ -68,41 +69,53 @@ app.use(
 );
 
 // ── [7] Static frontend ───────────────────────────────────────────────────────
-// Serve frontend/public from the monorepo root (two levels above backend/src)
+// Serve frontend/public from the monorepo root if present (otherwise API standalone)
 const frontendPath = path.join(__dirname, '../../frontend/public');
-app.use(express.static(frontendPath));
-console.log('[7] Static frontend served from:', frontendPath);
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath));
+  console.log('[7] Static frontend served from:', frontendPath);
+} else {
+  console.log('[7] Static frontend skipped (standalone API mode)');
+}
 
 // ── [8] DB config ─────────────────────────────────────────────────────────────
 // Pool is created at import; actual connection is deferred to Phase 2
 const { testConnection } = require('./config/database');
-console.log('[8] DB config loaded — connection deferred to Phase 2');
+console.log('[8] DB config loaded connection deferred to Phase 2');
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use(centralRouter);
 
-// ── 404 and error handlers — must be last ─────────────────────────────────────
+// ── 404 and error handlers must be last ─────────────────────────────────────
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
 // ── [9] Start listening ───────────────────────────────────────────────────────
 const server = app.listen(config.port, () => {
-  console.log(`[9] Server listening on PORT ${config.port} — http://localhost:${config.port}`);
+  console.log(`[9] Server listening on PORT ${config.port} http://localhost:${config.port}`);
   logger.info('Server started', { port: config.port, env: config.env });
 
-  // Async DB check — does not block startup; failure is non-fatal in Phase 1
+  // Async DB check does not block startup; failure is non-fatal in Phase 1
   testConnection().then(({ connected, message }) => {
     if (connected) {
       logger.info('Database connectivity check passed');
+      const { startExpiryWorker } = require('./workers/expiryWorker');
+      startExpiryWorker();
     } else {
       logger.warn('Database connectivity check: ' + message + ' (non-fatal in Phase 1)');
     }
   });
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`[9] Port ${config.port} already in use (dev server active). Attached gracefully.`);
+  } else {
+    throw err;
+  }
 });
 
 // Graceful shutdown on SIGTERM / SIGINT
 function shutdown(signal) {
-  logger.info(`${signal} received — shutting down gracefully`);
+  logger.info(`${signal} received shutting down gracefully`);
   server.close(() => {
     logger.info('HTTP server closed');
     process.exit(0);

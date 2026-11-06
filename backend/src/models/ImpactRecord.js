@@ -1,7 +1,7 @@
 /**
  * models/ImpactRecord.js
  * Data-access layer for the impact_records table.
- * One record is created per confirmed pickup — tracks redistributed quantities and geography.
+ * One record is created per confirmed pickup tracks redistributed quantities and geography.
  * All queries use parameterised placeholders.
  */
 
@@ -43,7 +43,7 @@ const ImpactRecord = {
   async getSummary() {
     const [impactRes, orgsRes, countriesRes] = await Promise.all([
       pool.query(
-        `SELECT COUNT(*) AS count, COALESCE(SUM(weight_kg), 0) AS weight FROM impact_records`
+        `SELECT COUNT(*) AS count, COALESCE(SUM(quantity), 0) AS portions, COALESCE(SUM(weight_kg), 0) AS weight FROM impact_records`
       ),
       pool.query(
         `SELECT COUNT(*) AS count FROM users
@@ -57,6 +57,7 @@ const ImpactRecord = {
 
     return {
       total_pickups:         parseInt(impactRes.rows[0].count, 10),
+      portions_shared:       parseInt(impactRes.rows[0].portions, 10),
       total_weight_kg:       parseFloat(impactRes.rows[0].weight),
       partner_organisations: parseInt(orgsRes.rows[0].count, 10),
       countries:             parseInt(countriesRes.rows[0].count, 10),

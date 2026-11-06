@@ -2,7 +2,7 @@
  * models/User.js
  * Data-access methods for the users table.
  * All queries use parameterised placeholders ($1, $2, ...).
- * No PII is logged — only user_id values appear in log output.
+ * No PII is logged only user_id values appear in log output.
  */
 
 'use strict';
@@ -18,9 +18,10 @@ const User = {
    * @returns {Promise<object|null>}
    */
   async findByEmail(email) {
+    if (!email) return null;
     const result = await pool.query(
-      `SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL LIMIT 1`,
-      [email]
+      `SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1`,
+      [email.trim()]
     );
     return result.rows[0] || null;
   },

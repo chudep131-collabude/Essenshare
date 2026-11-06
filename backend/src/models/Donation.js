@@ -1,11 +1,11 @@
 /**
  * models/Donation.js
  * Data-access layer for the donations table.
- * All queries use parameterised placeholders — no string concatenation of user input.
+ * All queries use parameterised placeholders no string concatenation of user input.
  *
  * Spatial search uses a bounding-box pre-filter on lat/lng columns plus
  * a haversine distance formula applied to the filtered set.
- * (PostGIS is not required — pure SQL haversine.)
+ * (PostGIS is not required pure SQL haversine.)
  */
 
 'use strict';
@@ -62,7 +62,7 @@ async function create(data) {
 
 /**
  * Find a donation by its ID.
- * Does not filter on deleted_at — callers decide what to do with soft-deleted rows.
+ * Does not filter on deleted_at callers decide what to do with soft-deleted rows.
  * @param {string} id UUID
  * @returns {Promise<object|null>}
  */
@@ -163,27 +163,26 @@ async function findNearby({
   }
 
   const result = await pool.query(
-    `SELECT *,
-       (6371 * acos(
-         LEAST(1, cos(radians($1)) * cos(radians(pickup_lat))
-           * cos(radians(pickup_lng) - radians($2))
-           + sin(radians($1)) * sin(radians(pickup_lat))
-         )
-       )) AS distance_km
-     FROM donations
-     WHERE status = 'ACTIVE'
-       AND deleted_at IS NULL
-       AND expires_at > NOW()
-       AND available_from <= NOW()
-       AND pickup_lat BETWEEN $3 AND $4
-       AND pickup_lng BETWEEN $5 AND $6
-       ${categoryClause}
-     HAVING (6371 * acos(
-       LEAST(1, cos(radians($1)) * cos(radians(pickup_lat))
-         * cos(radians(pickup_lng) - radians($2))
-         + sin(radians($1)) * sin(radians(pickup_lat))
-       )
-     )) <= $7
+    `SELECT * FROM (
+       SELECT *,
+         (6371 * acos(
+           LEAST(1.0, GREATEST(-1.0,
+             cos(radians($1)) * cos(radians(pickup_lat))
+             * cos(radians(pickup_lng) - radians($2))
+             + sin(radians($1)) * sin(radians(pickup_lat))
+           ))
+         )) AS distance_km
+       FROM donations
+       WHERE status = 'ACTIVE'
+         AND deleted_at IS NULL
+         AND expires_at > NOW()
+         AND available_from <= NOW()
+         AND quantity > 0
+         AND pickup_lat BETWEEN $3 AND $4
+         AND pickup_lng BETWEEN $5 AND $6
+         ${categoryClause}
+     ) sub
+     WHERE distance_km <= $7
      ORDER BY distance_km ASC
      LIMIT $8 OFFSET $9`,
     params
@@ -213,6 +212,7 @@ async function findActive({ limit = 50, offset = 0, category } = {}) {
          AND deleted_at IS NULL
          AND expires_at > NOW()
          AND available_from <= NOW()
+         AND quantity > 0
          AND category = $1
        ORDER BY created_at DESC
        LIMIT $2 OFFSET $3`,
@@ -227,6 +227,7 @@ async function findActive({ limit = 50, offset = 0, category } = {}) {
        AND deleted_at IS NULL
        AND expires_at > NOW()
        AND available_from <= NOW()
+       AND quantity > 0
      ORDER BY created_at DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
@@ -245,6 +246,7 @@ async function countActive({ category } = {}) {
       `SELECT COUNT(*) AS count FROM donations
        WHERE status = 'ACTIVE' AND deleted_at IS NULL
          AND expires_at > NOW() AND available_from <= NOW()
+         AND quantity > 0
          AND category = $1`,
       [category]
     );
@@ -253,7 +255,8 @@ async function countActive({ category } = {}) {
   const r = await pool.query(
     `SELECT COUNT(*) AS count FROM donations
      WHERE status = 'ACTIVE' AND deleted_at IS NULL
-       AND expires_at > NOW() AND available_from <= NOW()`
+       AND expires_at > NOW() AND available_from <= NOW()
+       AND quantity > 0`
   );
   return parseInt(r.rows[0].count, 10);
 }

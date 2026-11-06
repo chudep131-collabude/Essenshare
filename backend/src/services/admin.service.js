@@ -1,7 +1,7 @@
 /**
  * services/admin.service.js
  * Admin management operations.
- * Framework-agnostic — no Express imports.
+ * Framework-agnostic no Express imports.
  * AuditLog.create is always fire-and-forget (never awaited).
  * password_hash is NEVER returned from any function in this file.
  */
@@ -91,15 +91,23 @@ async function getDashboardStats() {
 async function listUsers({ role, status, search, page = 1, limit = 20 } = {}) {
   const offset = (page - 1) * limit;
   const params = [];
-  const conditions = ['deleted_at IS NULL'];
+  const conditions = [];
+
+  if (status === 'DELETED' || status === 'BANNED') {
+    conditions.push(`(deleted_at IS NOT NULL OR status = 'DELETED')`);
+  } else {
+    conditions.push('deleted_at IS NULL');
+    if (status === 'PENDING') {
+      conditions.push(`(status = 'PENDING' OR email_verified = FALSE)`);
+    } else if (status) {
+      params.push(status);
+      conditions.push(`status = $${params.length}`);
+    }
+  }
 
   if (role) {
     params.push(role);
     conditions.push(`role = $${params.length}`);
-  }
-  if (status) {
-    params.push(status);
-    conditions.push(`status = $${params.length}`);
   }
   if (search) {
     params.push(`%${search}%`);
@@ -151,7 +159,7 @@ async function getUser(userId) {
 
   const user = userResult.rows[0];
 
-  // Counts — run in parallel
+  // Counts run in parallel
   const [donationsRes, reportsRes] = await Promise.all([
     pool.query(
       `SELECT COUNT(*) AS count FROM donations WHERE donor_user_id = $1 AND deleted_at IS NULL`,
@@ -190,7 +198,7 @@ async function getUser(userId) {
  * @returns {Promise<object>} Updated user (no password_hash)
  */
 async function updateUserStatus(userId, status, reason, adminUserId, ipAddress) {
-  // Load target user (includes password_hash — we strip before returning)
+  // Load target user (includes password_hash we strip before returning)
   const target = await User.findById(userId);
   if (!target) {
     throw serviceError('User not found.', 'USER_NOT_FOUND', 404);
@@ -243,7 +251,7 @@ async function updateUserStatus(userId, status, reason, adminUserId, ipAddress) 
     );
   }
 
-  // Audit (fire-and-forget — no PII; reason is admin-entered, acceptable)
+  // Audit (fire-and-forget no PII; reason is admin-entered, acceptable)
   AuditLog.create({
     user_id:    adminUserId,
     action:     'USER_STATUS_UPDATED',
@@ -257,7 +265,7 @@ async function updateUserStatus(userId, status, reason, adminUserId, ipAddress) 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// listDonations (admin view — all statuses)
+// listDonations (admin view all statuses)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -291,7 +299,7 @@ async function listDonations({ status, donor_id, page = 1, limit = 20 } = {}) {
 
   params.push(limit, offset);
   const dataResult = await pool.query(
-    `SELECT d.*, dn.display_name AS donor_display_name
+    `SELECT d.*, dn.display_name AS donor_name, dn.display_name AS donor_display_name
      FROM donations d
      LEFT JOIN donors dn ON dn.user_id = d.donor_user_id
      ${where}
@@ -450,6 +458,262 @@ async function getAuditLogs({ action, user_id, from, to, page = 1, limit = 20 } 
   return { rows: dataResult.rows, total, page, limit };
 }
 
+/**
+ * List pending donor/organization verification requests.
+ */
+async function listVerificationQueue({ status = 'PENDING', page = 1, limit = 20 } = {}) {
+  const pageNum = Math.max(1, parseInt(page, 10));
+  const pageLimit = Math.min(100, Math.max(1, parseInt(limit, 10)));
+  const offset = (pageNum - 1) * pageLimit;
+
+  const countRes = await pool.query(
+    `SELECT COUNT(*) FROM verification_requests WHERE status = $1`,
+    [status]
+  );
+  const total = parseInt(countRes.rows[0].count, 10);
+
+  const dataRes = await pool.query(
+    `SELECT
+       vr.id, vr.user_id, vr.type, vr.status, vr.notes, vr.metadata,
+       vr.created_at, vr.updated_at,
+       u.email, u.full_name, u.role, u.status AS user_status,
+       d.business_name, d.business_reg_no,
+       o.org_name, o.registration_no, o.website
+     FROM verification_requests vr
+     JOIN users u ON u.id = vr.user_id
+     LEFT JOIN donors d ON d.user_id = vr.user_id
+     LEFT JOIN organizations o ON o.user_id = vr.user_id
+     WHERE vr.status = $1
+     ORDER BY vr.created_at ASC
+     LIMIT $2 OFFSET $3`,
+    [status, pageLimit, offset]
+  );
+
+  return {
+    requests: dataRes.rows,
+    pagination: {
+      total,
+      page: pageNum,
+      limit: pageLimit,
+      total_pages: Math.ceil(total / pageLimit),
+    },
+  };
+}
+
+/**
+ * Review (approve or reject) a verification request.
+ */
+async function reviewVerificationRequest(requestId, { status, notes }, adminUserId, ipAddress) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const existingRes = await client.query(
+      `SELECT * FROM verification_requests WHERE id = $1 FOR UPDATE`,
+      [requestId]
+    );
+    const existing = existingRes.rows[0];
+    if (!existing) {
+      throw serviceError('Verification request not found.', 'REQUEST_NOT_FOUND', 404);
+    }
+
+    const updatedRes = await client.query(
+      `UPDATE verification_requests
+       SET status = $1, notes = COALESCE($2, notes), reviewed_by = $3, reviewed_at = NOW(), updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [status, notes || null, adminUserId, requestId]
+    );
+
+    if (status === 'APPROVED') {
+      await client.query(
+        `UPDATE donors SET verification_level = 'BUSINESS_VERIFIED', updated_at = NOW() WHERE user_id = $1`,
+        [existing.user_id]
+      );
+      await client.query(
+        `UPDATE users SET status = 'ACTIVE', updated_at = NOW() WHERE id = $1 AND status = 'PENDING_APPROVAL'`,
+        [existing.user_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    AuditLog.create({
+      user_id: adminUserId,
+      action: 'VERIFICATION_REVIEWED',
+      resource: 'verification_requests',
+      ip_address: ipAddress || null,
+      outcome: 'SUCCESS',
+      meta: { request_id: requestId, user_id: existing.user_id, status },
+    });
+
+    return updatedRes.rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * List organizations with filters.
+ */
+async function listOrganizations({ verified, page = 1, limit = 20 } = {}) {
+  const pageNum = Math.max(1, parseInt(page, 10));
+  const pageLimit = Math.min(100, Math.max(1, parseInt(limit, 10)));
+  const offset = (pageNum - 1) * pageLimit;
+
+  const conditions = ['u.deleted_at IS NULL'];
+  const params = [];
+
+  if (verified !== undefined) {
+    params.push(verified === 'true' || verified === true);
+    conditions.push(`o.verified = $${params.length}`);
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const countRes = await pool.query(
+    `SELECT COUNT(*) FROM organizations o JOIN users u ON u.id = o.user_id ${where}`,
+    params
+  );
+  const total = parseInt(countRes.rows[0].count, 10);
+
+  params.push(pageLimit, offset);
+  const dataRes = await pool.query(
+    `SELECT
+       o.id, o.user_id, o.org_name, o.registration_no, o.address, o.website,
+       o.verified, o.created_at,
+       u.email, u.full_name, u.phone, u.status
+     FROM organizations o
+     JOIN users u ON u.id = o.user_id
+     ${where}
+     ORDER BY o.created_at DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+
+  return {
+    organizations: dataRes.rows,
+    pagination: {
+      total,
+      page: pageNum,
+      limit: pageLimit,
+      total_pages: Math.ceil(total / pageLimit),
+    },
+  };
+}
+
+/**
+ * Approve an organization application.
+ */
+async function approveOrganization(orgId, { notes } = {}, adminUserId, ipAddress) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const orgRes = await client.query(`SELECT * FROM organizations WHERE id = $1`, [orgId]);
+    const org = orgRes.rows[0];
+    if (!org) throw serviceError('Organization not found.', 'ORG_NOT_FOUND', 404);
+
+    await client.query(`UPDATE organizations SET verified = TRUE, updated_at = NOW() WHERE id = $1`, [orgId]);
+    await client.query(`UPDATE users SET status = 'ACTIVE', updated_at = NOW() WHERE id = $1`, [org.user_id]);
+
+    await client.query('COMMIT');
+
+    AuditLog.create({
+      user_id: adminUserId,
+      action: 'ORGANIZATION_APPROVED',
+      resource: 'organizations',
+      ip_address: ipAddress || null,
+      outcome: 'SUCCESS',
+      meta: { org_id: orgId, user_id: org.user_id, notes },
+    });
+
+    return { success: true, org_id: orgId, status: 'ACTIVE' };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Reject an organization application.
+ */
+async function rejectOrganization(orgId, { reason } = {}, adminUserId, ipAddress) {
+  const orgRes = await pool.query(`SELECT * FROM organizations WHERE id = $1`, [orgId]);
+  const org = orgRes.rows[0];
+  if (!org) throw serviceError('Organization not found.', 'ORG_NOT_FOUND', 404);
+
+  await pool.query(`UPDATE users SET status = 'SUSPENDED', updated_at = NOW() WHERE id = $1`, [org.user_id]);
+
+  AuditLog.create({
+    user_id: adminUserId,
+    action: 'ORGANIZATION_REJECTED',
+    resource: 'organizations',
+    ip_address: ipAddress || null,
+    outcome: 'SUCCESS',
+    meta: { org_id: orgId, user_id: org.user_id, reason },
+  });
+
+  return { success: true, org_id: orgId, status: 'REJECTED' };
+}
+
+/**
+ * Permanently remove/cancel a donation listing by admin.
+ */
+async function removeDonation(donationId, { reason } = {}, adminUserId, ipAddress) {
+  const donation = await pool.query('SELECT id, status FROM donations WHERE id = $1 AND deleted_at IS NULL', [donationId]);
+  if (!donation.rows[0]) throw serviceError('Donation not found.', 'DONATION_NOT_FOUND', 404);
+
+  await pool.query(
+    `UPDATE donations SET status = 'CANCELLED', deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
+    [donationId]
+  );
+
+  // Invalidate any active pending pickups
+  await pool.query(
+    `UPDATE pickups SET status = 'CANCELLED', updated_at = NOW() WHERE donation_id = $1 AND status = 'PENDING'`,
+    [donationId]
+  );
+
+  AuditLog.create({
+    user_id: adminUserId,
+    action: 'DONATION_REMOVED_BY_ADMIN',
+    resource: 'donations',
+    ip_address: ipAddress || null,
+    outcome: 'SUCCESS',
+    meta: { donation_id: donationId, reason },
+  });
+
+  return { success: true, donation_id: donationId };
+}
+
+/**
+ * Issue a warning to a donor (deducts 10 points from trust score).
+ */
+async function warnDonor(donorUserId, { reason } = {}, adminUserId, ipAddress) {
+  const donor = await pool.query('SELECT * FROM donors WHERE user_id = $1', [donorUserId]);
+  if (!donor.rows[0]) throw serviceError('Donor profile not found.', 'DONOR_NOT_FOUND', 404);
+
+  const newScore = Math.max(0, (donor.rows[0].trust_score ?? 100) - 10);
+  await pool.query(
+    `UPDATE donors SET trust_score = $1, updated_at = NOW() WHERE user_id = $2`,
+    [newScore, donorUserId]
+  );
+
+  AuditLog.create({
+    user_id: adminUserId,
+    action: 'DONOR_WARNED',
+    resource: 'donors',
+    ip_address: ipAddress || null,
+    outcome: 'SUCCESS',
+    meta: { donor_user_id: donorUserId, reason, new_trust_score: newScore },
+  });
+
+  return { success: true, donor_user_id: donorUserId, trust_score: newScore };
+}
+
 module.exports = {
   getDashboardStats,
   listUsers,
@@ -459,4 +723,11 @@ module.exports = {
   hideDonation,
   reinstateDonation,
   getAuditLogs,
+  listVerificationQueue,
+  reviewVerificationRequest,
+  listOrganizations,
+  approveOrganization,
+  rejectOrganization,
+  removeDonation,
+  warnDonor,
 };

@@ -28,6 +28,8 @@ interface ResolveFormState {
   reportId: string;
   status: string;
   notes: string;
+  autoHidden: boolean;
+  restoreDonation: boolean;
   loading: boolean;
   error: string | null;
 }
@@ -159,9 +161,14 @@ export default function AdminReportsPage() {
     if (!resolveForm) return;
     setResolveForm((prev) => prev ? { ...prev, loading: true, error: null } : prev);
     try {
-      await apiFetch(`/reports/${resolveForm.reportId}/resolve`, {
+      await apiFetch(`/admin/reports/${resolveForm.reportId}/resolve`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: resolveForm.status, notes: resolveForm.notes }),
+        body: JSON.stringify({
+          status: resolveForm.status,
+          resolution_notes: resolveForm.notes,
+          notes: resolveForm.notes,
+          restore_donation: resolveForm.restoreDonation,
+        }),
       });
       setResolveForm(null);
       await fetchReports();
@@ -229,6 +236,8 @@ export default function AdminReportsPage() {
               reportId: r.id,
               status: 'RESOLVED',
               notes: '',
+              autoHidden: r.auto_hidden,
+              restoreDonation: r.auto_hidden,
               loading: false,
               error: null,
             })
@@ -463,6 +472,26 @@ export default function AdminReportsPage() {
                   }}
                 />
               </div>
+
+              {resolveForm.autoHidden && resolveForm.status === 'RESOLVED' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
+                  <input
+                    id="restore-donation-check"
+                    type="checkbox"
+                    checked={resolveForm.restoreDonation}
+                    onChange={(e) =>
+                      setResolveForm((prev) => (prev ? { ...prev, restoreDonation: e.target.checked } : prev))
+                    }
+                    style={{ width: '18px', height: '18px', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  />
+                  <label
+                    htmlFor="restore-donation-check"
+                    style={{ fontSize: 'var(--step--1)', color: 'var(--ink)', cursor: 'pointer', fontWeight: 500 }}
+                  >
+                    Restore listing to Active status (unhide from browse)
+                  </label>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 'var(--space-s)', justifyContent: 'flex-end' }}>
                 <button

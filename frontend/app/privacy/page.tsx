@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description:
-    'Essenshare privacy policy — what we collect, what we never collect, and your rights over your data.',
+    'Essenshare privacy policy what we collect, what we never collect, and your rights over your data.',
 };
 
 export default function PrivacyPage() {
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <article className="max-w-page mx-auto px-[var(--space-page)] py-section">
       <div className="prose max-w-prose mx-auto">
         <h1 id="top">Privacy Policy</h1>
-        <p className="text-ink-quiet text-sm">Version 1.0 — October 2026</p>
+        <p className="text-ink-quiet text-sm">Version 1.0 October 2026</p>
 
         <nav aria-label="Privacy policy sections" className="not-prose my-8">
           <p className="text-sm font-semibold text-ink mb-2">Jump to section:</p>
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             <li>Display name (public)</li>
             <li>Email address (private)</li>
             <li>Phone number (private)</li>
-            <li>Pickup location address and coordinates (public — necessary for recipients to collect)</li>
+            <li>Pickup location address and coordinates (public necessary for recipients to collect)</li>
             <li>A record of your safety agreement acceptance</li>
           </ul>
 
@@ -139,7 +139,7 @@ export default function PrivacyPage() {
           </p>
           <p>
             We never sell or share personal data with third parties for advertising. We may use
-            third-party services for email delivery (SMTP), SMS verification, and geocoding — these
+            third-party services for email delivery (SMTP), SMS verification, and geocoding these
             receive only the minimum data necessary.
           </p>
         </section>

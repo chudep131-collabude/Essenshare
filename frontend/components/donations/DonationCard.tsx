@@ -1,9 +1,16 @@
 'use client';
+
 import { useState } from 'react';
-import { cn, formatTimeRemaining } from '@/lib/utils';
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { apiPost, ApiException } from '@/lib/api';
+import { apiPost } from '@/lib/api';
+import { friendlyError } from '@/lib/errors';
+import { useTranslation } from '@/lib/i18n';
+import { formatLocalizedTimeRemaining } from '@/lib/date';
+import { Navigation, AlertTriangle } from 'lucide-react';
+
 
 export interface Donation {
   id: string;
@@ -35,44 +42,47 @@ export interface Donation {
   donor_user_id: string;
   distance_km?: number;
   created_at: string;
+  image_url?: string | null;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  PREPARED_FOOD: 'Prepared Meals',
+  PREPARED_FOOD: 'Prepared',
   GROCERIES: 'Groceries',
-  PRODUCE: 'Fresh Produce',
+  PRODUCE: 'Produce',
   BAKERY: 'Bakery',
   DAIRY: 'Dairy',
   BEVERAGES: 'Beverages',
-  NON_FOOD_ESSENTIALS: 'Non-Food Essentials',
-  OTHER: 'Other',
+  NON_FOOD_ESSENTIALS: 'Essentials',
+  OTHER: 'Surplus',
+};
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  PREPARED_FOOD: '/web/prepared_food.jpg',
+  GROCERIES: '/web/groceries.jpg',
+  PRODUCE: '/web/produce.jpg',
+  BAKERY: '/web/bakery.jpg',
+  DAIRY: '/web/dairy.jpg',
+  BEVERAGES: '/web/beverages.jpg',
+  NON_FOOD_ESSENTIALS: '/web/donna-spearman-Kml12zn10wI-unsplash.jpg',
+  OTHER: '/web/chuttersnap-7eQlPra81zQ-unsplash.jpg',
 };
 
 const REPORT_CATEGORIES = [
-  { value: 'SAFETY_CONCERN', label: 'Safety concern' },
-  { value: 'INCORRECT_INFO', label: 'Incorrect information' },
-  { value: 'ALREADY_CLAIMED', label: 'Already claimed / gone' },
-  { value: 'SPAM', label: 'Spam or fraudulent' },
-  { value: 'OTHER', label: 'Other' },
+  { value: 'UNSAFE_FOOD', label: 'Unsafe food' },
+  { value: 'SPOILED_OR_EXPIRED', label: 'Spoiled or expired' },
+  { value: 'WRONG_ALLERGEN_INFO', label: 'Wrong allergen info' },
+  { value: 'WRONG_DESCRIPTION', label: 'Incorrect description' },
+  { value: 'COLD_CHAIN_CONCERN', label: 'Cold chain / temperature concern' },
+  { value: 'ALREADY_GONE', label: 'Already claimed / gone' },
+  { value: 'DONOR_MISCONDUCT', label: 'Donor misconduct' },
+  { value: 'OTHER', label: 'Other concern' },
 ];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  PREPARED_FOOD:       'oklch(58% 0.18 32)',
-  GROCERIES:           'oklch(52% 0.16 150)',
-  PRODUCE:             'oklch(62% 0.18 142)',
-  BAKERY:              'oklch(60% 0.16 55)',
-  DAIRY:               'oklch(65% 0.12 220)',
-  BEVERAGES:           'oklch(55% 0.14 260)',
-  NON_FOOD_ESSENTIALS: 'oklch(55% 0.12 300)',
-  OTHER:               'oklch(55% 0.08 80)',
-};
-
-function getExpiryColour(expiresAt: string): string {
+function getExpiryInfo(expiresAt: string, locale?: any) {
   const msLeft = new Date(expiresAt).getTime() - Date.now();
-  if (msLeft < 0) return 'var(--error)';
-  if (msLeft < 60 * 60 * 1000) return 'var(--error)';
-  if (msLeft < 4 * 60 * 60 * 1000) return 'var(--warning)';
-  return 'var(--success)';
+  if (msLeft <= 0) return { isUrgent: true, text: 'Expired', isExpired: true };
+  const isUrgent = msLeft < 4 * 60 * 60 * 1000;
+  return { isUrgent, text: formatLocalizedTimeRemaining(expiresAt, locale), isExpired: false };
 }
 
 interface DonationCardProps {
@@ -80,6 +90,8 @@ interface DonationCardProps {
   onRequestPickup?: (donationId: string, trigger?: HTMLElement) => void;
   showCancelButton?: boolean;
   onCancel?: (donationId: string) => void | Promise<void>;
+  showRecallButton?: boolean;
+  onRecall?: (donationId: string) => void | Promise<void>;
 }
 
 export default function DonationCard({
@@ -87,20 +99,24 @@ export default function DonationCard({
   onRequestPickup,
   showCancelButton,
   onCancel,
+  showRecallButton,
+  onRecall,
 }: DonationCardProps) {
+  const { t, locale, formatDistance: formatDistLocale, formatTimeRemaining: formatTimeLocale } = useTranslation();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportCategory, setReportCategory] = useState('');
   const [reportDescription, setReportDescription] = useState('');
-  const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
-    'idle'
-  );
+  const [reportStatus, setReportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [reportError, setReportError] = useState<string | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string>(
+    donation.image_url || CATEGORY_IMAGES[donation.category] || '/web/bakery.jpg'
+  );
 
-  const timeRemaining = formatTimeRemaining(donation.expires_at);
-  const isExpired = timeRemaining === 'Expired';
-  const displayedAllergens = donation.allergens?.slice(0, 3) ?? [];
+  const expiry = getExpiryInfo(donation.expires_at, locale);
+  const displayedAllergens = donation.allergens?.slice(0, 1) ?? [];
   const extraAllergens = (donation.allergens?.length ?? 0) - displayedAllergens.length;
+
 
   async function handleReport(e: React.FormEvent) {
     e.preventDefault();
@@ -117,9 +133,7 @@ export default function DonationCard({
       setReportOpen(false);
     } catch (err) {
       setReportStatus('error');
-      setReportError(
-        err instanceof ApiException ? err.message : 'Could not submit report. Please try again.'
-      );
+      setReportError(friendlyError(err, 'Could not submit your report. Please try again.'));
     }
   }
 
@@ -133,335 +147,374 @@ export default function DonationCard({
     }
   }
 
-  const chipClass =
-    'inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium bg-[var(--surface-soft)] text-[var(--ink-muted)]';
-
-  const categoryColor = CATEGORY_COLORS[donation.category] ?? 'var(--accent)';
+  const categoryLabel = CATEGORY_LABELS[donation.category] ?? donation.category;
 
   return (
     <article
       aria-label={donation.title}
-      style={{
-        position: 'relative',
-        background: 'var(--surface)',
-        border: '1px solid var(--line)',
-        borderRadius: 'var(--radius-md)',
-        overflow: 'hidden',
-        borderTop: `4px solid ${categoryColor}`,
-        transition:
-          'transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out)',
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
-        (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.transform = '';
-        (e.currentTarget as HTMLElement).style.boxShadow = '';
-      }}
+      className="group relative flex flex-col h-full rounded-2xl border border-[var(--line)] bg-[var(--surface)] overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
     >
-      <div style={{ padding: 'var(--space-l)' }}>
-        {/* Urgent expiry badge — absolute, top-right, only < 4 hours */}
-        {(() => {
-          const msLeft = new Date(donation.expires_at).getTime() - Date.now();
-          if (msLeft > 0 && msLeft < 4 * 60 * 60 * 1000) {
-            return (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'var(--space-m)',
-                  right: 'var(--space-m)',
-                  fontSize: 'var(--step--1)',
-                  fontWeight: 600,
-                  color: getExpiryColour(donation.expires_at),
-                  background: 'var(--surface)',
-                  border: `1.5px solid ${getExpiryColour(donation.expires_at)}`,
-                  borderRadius: 'var(--radius-pill)',
-                  padding: '0.2rem 0.6rem',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-                aria-label={`Expires in ${timeRemaining}`}
-              >
-                {timeRemaining}
-              </div>
-            );
-          }
-          return null;
-        })()}
-
-        {/* Eyebrow row — category + distance */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--space-s)',
-            marginBottom: 'var(--space-xs)',
+      {/* ─── Integrated Photo Header (Attached directly to card) ─── */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--surface-soft)] shrink-0">
+        <Image
+          src={imgSrc}
+          alt={donation.title}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          onError={() => {
+            setImgSrc(CATEGORY_IMAGES[donation.category] || '/web/bakery.jpg');
           }}
-        >
-          <span
-            style={{
-              fontSize: 'var(--step--1)',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              color: categoryColor,
-            }}
-          >
-            {CATEGORY_LABELS[donation.category] ?? donation.category}
-          </span>
-          {donation.distance_km !== undefined && (
-            <span
-              style={{
-                fontSize: 'var(--step--1)',
-                color: 'var(--ink-quiet)',
-                fontVariantNumeric: 'tabular-nums',
-                flexShrink: 0,
-              }}
-            >
-              {donation.distance_km < 1
-                ? `${Math.round(donation.distance_km * 1000)} m`
-                : `${donation.distance_km.toFixed(1)} km`}
-            </span>
-          )}
-        </div>
+          priority={false}
+        />
 
-        {/* Title */}
-        <h3
-          style={{
-            fontSize: 'var(--step-1)',
-            fontWeight: 700,
-            color: 'var(--ink)',
-            lineHeight: 1.2,
-            letterSpacing: '-0.02em',
-            textWrap: 'balance',
-            marginBottom: 'var(--space-xs)',
-          } as React.CSSProperties}
-        >
-          {donation.title}
-        </h3>
-
-        {/* Description — 1 line truncated */}
-        {donation.description && (
-          <p
-            style={{
-              fontSize: 'var(--step--1)',
-              color: 'var(--ink-muted)',
-              marginBottom: 'var(--space-xs)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {donation.description}
-          </p>
-        )}
-
-        {/* Meta row — quantity · address */}
+        {/* Ambient readability scrims */}
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-xs)',
-            fontSize: 'var(--step--1)',
-            color: 'var(--ink-muted)',
-            marginBottom: 'var(--space-xs)',
-            fontVariantNumeric: 'tabular-nums',
-            overflow: 'hidden',
-          }}
-        >
-          <span>
-            {donation.quantity} {donation.quantity_unit}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {donation.pickup_address}
-          </span>
-        </div>
+          className="absolute inset-x-0 top-0 h-14 sm:h-16 bg-gradient-to-b from-black/70 via-black/30 to-transparent pointer-events-none"
+          aria-hidden="true"
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 h-14 sm:h-16 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"
+          aria-hidden="true"
+        />
 
-        {/* Dietary + allergen chips */}
-        {(donation.is_halal ||
-          donation.is_vegan ||
-          donation.is_vegetarian ||
-          displayedAllergens.length > 0) && (
-          <div className="flex flex-wrap gap-1.5" style={{ marginBottom: 'var(--space-xs)' }}>
-            {donation.is_halal && <span className={chipClass}>Halal</span>}
-            {donation.is_vegan && <span className={chipClass}>Vegan</span>}
-            {donation.is_vegetarian && <span className={chipClass}>Vegetarian</span>}
-            {displayedAllergens.map((a) => (
+        {/* Top Overlay Row: Category Pill (Left) & Distance/Expiry (Right) */}
+        <div className="absolute top-2 inset-x-2 sm:top-2.5 sm:inset-x-2.5 flex items-center justify-between gap-1 z-10">
+          {/* Category Pill */}
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-white bg-black/60 backdrop-blur-md border border-white/20 shadow-sm shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
+            <span>{t('categories.' + donation.category) || CATEGORY_LABELS[donation.category] || 'Surplus'}</span>
+          </span>
+
+          {/* Badges on right: Expiry + Distance */}
+          <div className="inline-flex items-center gap-1 shrink-0">
+            {expiry.isUrgent && (
               <span
-                key={a}
-                className={cn(chipClass, 'bg-[var(--warning-bg)] text-[var(--warning)]')}
+                className={cn(
+                  'inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold shadow-sm backdrop-blur-md border',
+                  expiry.isExpired
+                    ? 'bg-rose-500/90 text-white border-rose-400/40'
+                    : 'bg-amber-500/90 text-white border-amber-400/40'
+                )}
+                aria-label={`Expires: ${expiry.text}`}
               >
-                {a}
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>{expiry.isExpired ? t('common.expired') : formatTimeLocale(donation.expires_at)}</span>
               </span>
-            ))}
-            {extraAllergens > 0 && (
-              <span className={cn(chipClass, 'bg-[var(--warning-bg)] text-[var(--warning)]')}>
-                +{extraAllergens} more
+            )}
+
+            {donation.distance_km !== undefined && (
+              <span
+                className="inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold text-white bg-black/60 backdrop-blur-md border border-white/20 shadow-sm tabular-nums"
+                aria-label={`${t('common.distance')}: ${formatDistLocale(donation.distance_km)}`}
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <span>{formatDistLocale(donation.distance_km)}</span>
               </span>
             )}
           </div>
-        )}
+        </div>
 
-        {/* Action row */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--space-s)',
-            paddingTop: 'var(--space-m)',
-          }}
-        >
-          {/* Primary action */}
-          {onRequestPickup && !isExpired && !showCancelButton && (
-            <button
-              type="button"
-              onClick={(e) => onRequestPickup(donation.id, e.currentTarget)}
-              aria-label={`Get pickup code for ${donation.title}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1.25rem',
-                borderRadius: 'var(--radius-pill)',
-                background: 'var(--accent)',
-                color: 'var(--accent-on)',
-                fontWeight: 700,
-                fontSize: 'var(--step-0)',
-                border: 'none',
-                cursor: 'pointer',
-                minHeight: '44px',
-                flex: 1,
-                justifyContent: 'center',
-              }}
+        {/* Bottom Overlay Row: Quantity Highlight */}
+        <div className="absolute bottom-2 inset-x-2 sm:bottom-2.5 sm:inset-x-2.5 flex items-center justify-between text-white text-[10px] sm:text-xs z-10 pointer-events-none">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/65 backdrop-blur-md text-white font-medium border border-white/10 shrink-0">
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+              aria-hidden="true"
             >
-              Get Pickup Code <span aria-hidden="true">→</span>
-            </button>
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+              <line x1="12" y1="22.08" x2="12" y2="12" />
+            </svg>
+            <span>{donation.quantity} {donation.quantity_unit}</span>
+          </span>
+
+          {!expiry.isUrgent && (
+            <span className="text-white/85 font-medium text-[10px] drop-shadow-sm truncate ml-1">
+              {expiry.text}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Card Content Body ─── */}
+      <div className="p-3 sm:p-3.5 md:p-4 flex flex-col flex-1 justify-between gap-2.5">
+        <div className="space-y-1 sm:space-y-1.5">
+          {/* Title */}
+          <h3 className="text-xs sm:text-sm md:text-base font-bold text-[var(--ink)] leading-snug line-clamp-1 group-hover:text-[var(--accent)] transition-colors">
+            {donation.title}
+          </h3>
+
+          {/* Description (visible on sm+) */}
+          {donation.description && (
+            <p className="hidden sm:block text-[11px] text-[var(--ink-muted)] line-clamp-1 leading-relaxed">
+              {donation.description}
+            </p>
           )}
 
-          {showCancelButton && onCancel && (
-            <button
-              type="button"
-              onClick={handleCancel}
-              disabled={cancelLoading}
-              aria-label={`Cancel listing: ${donation.title}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1.25rem',
-                borderRadius: 'var(--radius-pill)',
-                color: 'var(--error)',
-                border: '1.5px solid color-mix(in oklch, var(--error) 30%, transparent)',
-                background: 'transparent',
-                fontWeight: 600,
-                fontSize: 'var(--step-0)',
-                cursor: 'pointer',
-                minHeight: '44px',
-                opacity: cancelLoading ? 0.5 : 1,
-              }}
+          {/* Pickup Address — Clickable to focus on the interactive map */}
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined' && (window as unknown as { _essenshareFocusDonation?: (id: string) => void })._essenshareFocusDonation) {
+                (window as unknown as { _essenshareFocusDonation: (id: string) => void })._essenshareFocusDonation(donation.id);
+              }
+            }}
+            title="Click to view and zoom on map"
+            className="flex items-center gap-1 text-[11px] text-[var(--ink-muted)] hover:text-[var(--accent)] transition-colors text-left group/addr cursor-pointer w-full"
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[var(--ink-quiet)] group-hover/addr:text-[var(--accent)] shrink-0 transition-colors"
+              aria-hidden="true"
             >
-              {cancelLoading ? <LoadingSpinner size="sm" label="Cancelling" /> : null}
-              Cancel listing
-            </button>
-          )}
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="truncate group-hover/addr:underline decoration-dotted">{donation.pickup_address}</span>
+            <span className="text-[10px] text-[var(--accent)] font-semibold shrink-0 opacity-0 group-hover/addr:opacity-100 transition-opacity ml-auto">
+              Map ↗
+            </span>
+          </button>
 
-          {/* Report button far right */}
-          {reportStatus !== 'success' && (
-            <button
-              type="button"
-              onClick={() => setReportOpen((v) => !v)}
-              style={{
-                fontSize: 'var(--step--1)',
-                color: 'var(--ink-quiet)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                flexShrink: 0,
-                padding: '0.4rem',
-              }}
-              aria-expanded={reportOpen}
-              aria-controls={`report-form-${donation.id}`}
-            >
-              Report
-            </button>
-          )}
-          {reportStatus === 'success' && (
-            <p style={{ fontSize: 'var(--step--1)', color: 'var(--ink-muted)' }}>Reported</p>
+          {/* Dietary & Allergen chips */}
+          {(donation.is_halal ||
+            donation.is_vegan ||
+            donation.is_vegetarian ||
+            displayedAllergens.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+              {donation.is_halal && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50">
+                  {t('dietary.halal')}
+                </span>
+              )}
+              {donation.is_vegan && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-800 border border-green-200/80 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800/50">
+                  {t('dietary.vegan')}
+                </span>
+              )}
+              {donation.is_vegetarian && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-lime-50 text-lime-800 border border-lime-200/80 dark:bg-lime-950/40 dark:text-lime-300 dark:border-lime-800/50">
+                  {t('dietary.vegetarian')}
+                </span>
+              )}
+              {displayedAllergens.map((allergen) => (
+                <span
+                  key={allergen}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50"
+                >
+                  {allergen}
+                </span>
+              ))}
+              {extraAllergens > 0 && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50">
+                  +{extraAllergens}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Report form */}
-        {reportOpen && reportStatus !== 'success' && (
-          <form
-            id={`report-form-${donation.id}`}
-            onSubmit={handleReport}
-            className="space-y-2 border-t border-line pt-3"
-          >
-            {reportError && (
-              <Alert type="error" className="mb-1">
-                {reportError}
-              </Alert>
+        {/* ─── Actions Row ─── */}
+        <div className="pt-2 border-t border-[var(--line)] flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-1.5">
+            {/* Primary Action Button */}
+            {onRequestPickup && !expiry.isExpired && !showCancelButton && (
+              donation.quantity > 0 ? (
+                <button
+                  type="button"
+                  onClick={(e) => onRequestPickup(donation.id, e.currentTarget)}
+                  aria-label={`${t('common.get_code')}: ${donation.title}`}
+                  className="inline-flex items-center justify-center gap-1 flex-1 py-2 px-2.5 rounded-full bg-[var(--accent)] text-[var(--accent-on)] font-bold text-xs sm:text-sm shadow-xs hover:brightness-105 active:scale-[0.99] transition-all min-h-[36px] sm:min-h-[40px] cursor-pointer"
+                >
+                  <span>{t('common.get_code')}</span>
+                  <span aria-hidden="true" className="font-sans text-xs sm:text-sm rtl:rotate-180">→</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-1 flex-1 py-2 px-2.5 rounded-full bg-[var(--surface-soft)] text-[var(--ink-muted)] font-semibold text-xs sm:text-sm border border-[var(--line)] min-h-[36px] sm:min-h-[40px]">
+                  {t('common.all_claimed')}
+                </span>
+              )
             )}
-            <div>
-              <label
-                htmlFor={`report-cat-${donation.id}`}
-                className="block text-xs font-medium text-ink-muted mb-1"
+
+            {/* 100% In-App Directions Button */}
+            {!showCancelButton && (
+              <button
+                type="button"
+                id={`directions-btn-${donation.id}`}
+                aria-label={`${t('common.directions')}: ${donation.title}`}
+                onClick={() => {
+                  if (
+                    typeof window !== 'undefined' &&
+                    (window as unknown as { _essenshareGetDirections?: (id: string, donation?: Donation) => void })._essenshareGetDirections
+                  ) {
+                    (window as unknown as { _essenshareGetDirections: (id: string, donation?: Donation) => void })._essenshareGetDirections(donation.id, donation);
+                  }
+                }}
+                title={t('common.directions')}
+                className="inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-full border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink)] font-semibold text-xs shadow-xs hover:border-[var(--accent)] hover:text-[var(--accent)] active:scale-[0.99] transition-all min-h-[36px] sm:min-h-[40px] cursor-pointer shrink-0"
               >
-                Reason
-              </label>
-              <select
-                id={`report-cat-${donation.id}`}
-                value={reportCategory}
-                onChange={(e) => setReportCategory(e.target.value)}
-                required
-                className="w-full px-3 py-2 rounded-md border border-line text-xs text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                <Navigation className="w-3.5 h-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('common.directions')}</span>
+              </button>
+            )}
+
+            {/* Cancel Listing Button for Donors */}
+            {showCancelButton && onCancel && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={cancelLoading}
+                aria-label={`Cancel listing: ${donation.title}`}
+                className="inline-flex items-center justify-center gap-1 flex-1 py-2 px-2.5 rounded-full text-rose-600 border border-rose-200 hover:bg-rose-50 dark:text-rose-400 dark:border-rose-900/60 dark:hover:bg-rose-950/30 font-semibold text-xs sm:text-sm transition-colors min-h-[36px] sm:min-h-[40px] cursor-pointer disabled:opacity-50"
               >
-                <option value="">Select a reason…</option>
-                {REPORT_CATEGORIES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor={`report-desc-${donation.id}`}
-                className="block text-xs font-medium text-ink-muted mb-1"
+                {cancelLoading && <LoadingSpinner size="sm" label="Cancelling" />}
+                <span>Cancel</span>
+              </button>
+            )}
+
+            {/* Emergency Recall Button for Donors */}
+            {showRecallButton && onRecall && donation.status !== 'RECALLED' && donation.status !== 'COMPLETED' && (
+              <button
+                type="button"
+                onClick={() => onRecall(donation.id)}
+                aria-label={`Emergency recall listing: ${donation.title}`}
+                className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full text-amber-700 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 dark:text-amber-300 font-semibold text-xs transition-colors cursor-pointer shrink-0"
               >
-                Details (optional)
-              </label>
-              <textarea
-                id={`report-desc-${donation.id}`}
-                value={reportDescription}
-                onChange={(e) => setReportDescription(e.target.value.slice(0, 500))}
-                rows={2}
-                maxLength={500}
-                className="w-full px-3 py-2 rounded-md border border-line text-xs text-ink bg-surface focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] resize-none"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={reportStatus === 'loading' || !reportCategory}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface-soft border border-line text-xs font-medium text-ink hover:bg-line transition-colors disabled:opacity-50 min-h-[44px]"
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                <span>Recall</span>
+              </button>
+            )}
+
+            {/* Report Button */}
+            {reportStatus !== 'success' && (
+              <button
+                type="button"
+                onClick={() => setReportOpen((v) => !v)}
+                aria-expanded={reportOpen}
+                aria-controls={`report-form-${donation.id}`}
+                className="text-[11px] text-[var(--ink-quiet)] hover:text-[var(--ink-muted)] py-1 px-1 transition-colors shrink-0"
+              >
+                Report
+              </button>
+            )}
+
+            {reportStatus === 'success' && (
+              <span className="text-[11px] text-[var(--ink-muted)] shrink-0">Reported</span>
+            )}
+          </div>
+
+          {/* Inline Report Form */}
+          {reportOpen && reportStatus !== 'success' && (
+            <form
+              id={`report-form-${donation.id}`}
+              onSubmit={handleReport}
+              className="space-y-2 border-t border-[var(--line)] pt-2 mt-1"
             >
-              {reportStatus === 'loading' && (
-                <LoadingSpinner size="sm" label="Submitting" />
+              {reportError && (
+                <Alert type="error" className="mb-1 text-xs">
+                  {reportError}
+                </Alert>
               )}
-              Submit report
-            </button>
-          </form>
-        )}
+              <div>
+                <label
+                  htmlFor={`report-cat-${donation.id}`}
+                  className="block text-[11px] font-medium text-[var(--ink-muted)] mb-1"
+                >
+                  Reason
+                </label>
+                <select
+                  id={`report-cat-${donation.id}`}
+                  value={reportCategory}
+                  onChange={(e) => setReportCategory(e.target.value)}
+                  required
+                  className="w-full px-2 py-1.5 rounded-lg border border-[var(--line)] text-xs text-[var(--ink)] bg-[var(--surface)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                >
+                  <option value="">Select reason…</option>
+                  {REPORT_CATEGORIES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor={`report-desc-${donation.id}`}
+                  className="block text-[11px] font-medium text-[var(--ink-muted)] mb-1"
+                >
+                  Details (optional)
+                </label>
+                <textarea
+                  id={`report-desc-${donation.id}`}
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value.slice(0, 500))}
+                  rows={2}
+                  maxLength={500}
+                  className="w-full px-2 py-1.5 rounded-lg border border-[var(--line)] text-xs text-[var(--ink)] bg-[var(--surface)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] resize-none"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={reportStatus === 'loading' || !reportCategory}
+                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-[var(--surface-soft)] border border-[var(--line)] text-xs font-medium text-[var(--ink)] hover:bg-[var(--line)] transition-colors disabled:opacity-50 min-h-[32px]"
+                >
+                  {reportStatus === 'loading' && <LoadingSpinner size="sm" label="Submitting" />}
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  className="text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] px-1.5 py-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </article>
   );

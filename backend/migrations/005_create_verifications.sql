@@ -1,6 +1,6 @@
 -- 005_create_verifications.sql
 -- One-time verification codes (email verification, password reset).
--- Only hashes of codes are stored — raw codes are never persisted.
+-- Only hashes of codes are stored raw codes are never persisted.
 
 CREATE TABLE IF NOT EXISTS verifications (
   id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),

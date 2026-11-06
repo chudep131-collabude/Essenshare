@@ -1,11 +1,11 @@
 /**
  * services/donation.service.js
  * Business logic for donation lifecycle management.
- * Framework-agnostic — no Express imports.
+ * Framework-agnostic no Express imports.
  *
  * Security rules enforced:
  *  - Ownership verified before any mutation (updateDonation, deleteDonation)
- *  - All DB access via parameterised model methods — no raw query concatenation
+ *  - All DB access via parameterised model methods no raw query concatenation
  *  - No PII in any log statement
  *  - Errors thrown as { message, code, statusCode } service errors
  */
@@ -14,6 +14,7 @@
 
 const Donation = require('../models/Donation');
 const AuditLog = require('../models/AuditLog');
+const { pool } = require('../config/database');
 const { logger } = require('../utils/logger');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ async function listMyDonations(donorUserId, { page = 1, limit = 20 } = {}) {
 
 /**
  * Update a donation.
- * Verifies ownership — only the donor who created it can update it.
+ * Verifies ownership only the donor who created it can update it.
  * Only ACTIVE donations can be updated.
  *
  * @param {string} id
@@ -243,6 +244,243 @@ async function deleteDonation(id, donorUserId, ipAddress) {
   });
 }
 
+/**
+ * Emergency Food Safety Recall for a donation.
+ * Allowed for the donation owner or an ADMIN.
+ * Sets status to 'RECALLED', updates all PENDING pickups to 'RECALLED',
+ * and records an urgent safety audit log.
+ */
+async function recallDonation(id, reason, userId, userRole, ipAddress) {
+  const existing = await Donation.findById(id);
+  if (!existing || existing.deleted_at) {
+    throw serviceError('Donation not found.', 'DONATION_NOT_FOUND', 404);
+  }
+
+  const isOwner = existing.donor_user_id === userId;
+  const isAdmin = userRole === 'ADMIN';
+
+  if (!isOwner && !isAdmin) {
+    throw serviceError('You do not have permission to recall this donation.', 'FORBIDDEN', 403);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Mark donation as RECALLED
+    await client.query(
+      `UPDATE donations
+       SET status = 'RECALLED',
+           pickup_notes = CONCAT('EMERGENCY RECALL: ', $1::text),
+           updated_at = NOW()
+       WHERE id = $2`,
+      [reason || 'Food safety alert', id]
+    );
+
+    // 2. Mark any active pending pickups as RECALLED
+    const cancelledPickups = await client.query(
+      `UPDATE pickups
+       SET status = 'RECALLED',
+           updated_at = NOW()
+       WHERE donation_id = $1
+         AND status = 'PENDING'
+       RETURNING id, session_id`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    // Audit log
+    AuditLog.create({
+      user_id: userId,
+      action: 'DONATION_EMERGENCY_RECALLED',
+      resource: 'donations',
+      ip_address: ipAddress,
+      outcome: 'SUCCESS',
+      meta: {
+        donation_id: id,
+        reason,
+        affected_pickups_count: cancelledPickups.rowCount,
+      },
+    });
+
+    return {
+      success: true,
+      donation_id: id,
+      recalled_pickups: cancelledPickups.rowCount,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Extend pickup deadline for an existing listing.
+ */
+async function extendDonation(id, newDeadline, donorUserId, ipAddress) {
+  const existing = await Donation.findByIdAndDonor(id, donorUserId);
+  if (!existing) {
+    throw serviceError('Donation not found.', 'DONATION_NOT_FOUND', 404);
+  }
+  if (['COMPLETED', 'CANCELLED', 'RECALLED'].includes(existing.status)) {
+    throw serviceError(
+      `Cannot extend a donation with status ${existing.status}.`,
+      'DONATION_NOT_EXTENDABLE',
+      409
+    );
+  }
+  const deadlineDate = new Date(newDeadline);
+  if (isNaN(deadlineDate.getTime()) || deadlineDate.getTime() <= Date.now()) {
+    throw serviceError('New deadline must be in the future.', 'INVALID_DEADLINE', 400);
+  }
+
+  // Restore status to ACTIVE if previously EXPIRED
+  const newStatus = existing.status === 'EXPIRED' ? 'ACTIVE' : existing.status;
+
+  const result = await pool.query(
+    `UPDATE donations
+     SET expires_at = $1, status = $2, updated_at = NOW()
+     WHERE id = $3 AND donor_user_id = $4
+     RETURNING *`,
+    [deadlineDate, newStatus, id, donorUserId]
+  );
+
+  logger.info('donation.service: donation deadline extended', { donationId: id, userId: donorUserId });
+
+  AuditLog.create({
+    user_id: donorUserId,
+    action: 'DONATION_EXTENDED',
+    resource: 'donations',
+    ip_address: ipAddress,
+    outcome: 'SUCCESS',
+    meta: { donation_id: id, new_deadline: newDeadline },
+  });
+
+  return { donation: result.rows[0] };
+}
+
+/**
+ * Scheduled worker job: find all listings where expires_at < NOW() and
+ * status is ACTIVE or LOW_STOCK, transition them to EXPIRED, and invalidate any
+ * active PENDING pickup reservations.
+ */
+async function markExpiredDonations() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const expiredDonations = await client.query(
+      `UPDATE donations
+       SET status = 'EXPIRED', updated_at = NOW()
+       WHERE status IN ('ACTIVE', 'LOW_STOCK')
+         AND expires_at < NOW()
+         AND deleted_at IS NULL
+       RETURNING id`
+    );
+
+    let expiredPickupsCount = 0;
+    if (expiredDonations.rows.length > 0) {
+      const expiredIds = expiredDonations.rows.map(r => r.id);
+      const pickupsResult = await client.query(
+        `UPDATE pickups
+         SET status = 'EXPIRED', updated_at = NOW()
+         WHERE donation_id = ANY($1::uuid[])
+           AND status = 'PENDING'
+         RETURNING id`,
+        [expiredIds]
+      );
+      expiredPickupsCount = pickupsResult.rowCount;
+    }
+
+    await client.query('COMMIT');
+    return {
+      expired_donations_count: expiredDonations.rowCount,
+      expired_pickups_count: expiredPickupsCount,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Add an image reference to a donation (max 4).
+ */
+async function addDonationImage(donationId, { url, alt_text, display_order }, donorUserId, ipAddress) {
+  const existing = await Donation.findByIdAndDonor(donationId, donorUserId);
+  if (!existing) {
+    throw serviceError('Donation not found.', 'DONATION_NOT_FOUND', 404);
+  }
+
+  const countRes = await pool.query(
+    `SELECT COUNT(*) FROM donation_images WHERE donation_id = $1`,
+    [donationId]
+  );
+  if (parseInt(countRes.rows[0].count, 10) >= 4) {
+    throw serviceError('Maximum of 4 images per donation listing reached.', 'MAX_IMAGES_REACHED', 400);
+  }
+
+  const result = await pool.query(
+    `INSERT INTO donation_images (donation_id, url, alt_text, display_order)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [donationId, url, alt_text || null, display_order ?? 0]
+  );
+
+  AuditLog.create({
+    user_id: donorUserId,
+    action: 'DONATION_IMAGE_ADDED',
+    resource: 'donation_images',
+    ip_address: ipAddress,
+    outcome: 'SUCCESS',
+    meta: { donation_id: donationId, image_id: result.rows[0].id },
+  });
+
+  return result.rows[0];
+}
+
+/**
+ * Remove an image reference from a donation.
+ */
+async function removeDonationImage(donationId, imageId, donorUserId, ipAddress) {
+  const existing = await Donation.findByIdAndDonor(donationId, donorUserId);
+  if (!existing) {
+    throw serviceError('Donation not found.', 'DONATION_NOT_FOUND', 404);
+  }
+
+  const result = await pool.query(
+    `DELETE FROM donation_images WHERE id = $1 AND donation_id = $2 RETURNING id`,
+    [imageId, donationId]
+  );
+  if (!result.rows[0]) {
+    throw serviceError('Image not found.', 'IMAGE_NOT_FOUND', 404);
+  }
+
+  AuditLog.create({
+    user_id: donorUserId,
+    action: 'DONATION_IMAGE_REMOVED',
+    resource: 'donation_images',
+    ip_address: ipAddress,
+    outcome: 'SUCCESS',
+    meta: { donation_id: donationId, image_id: imageId },
+  });
+}
+
+/**
+ * Get all images for a donation.
+ */
+async function getDonationImages(donationId) {
+  const result = await pool.query(
+    `SELECT * FROM donation_images WHERE donation_id = $1 ORDER BY display_order ASC, created_at ASC`,
+    [donationId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   createDonation,
   getDonation,
@@ -250,4 +488,10 @@ module.exports = {
   listMyDonations,
   updateDonation,
   deleteDonation,
+  recallDonation,
+  extendDonation,
+  markExpiredDonations,
+  addDonationImage,
+  removeDonationImage,
+  getDonationImages,
 };

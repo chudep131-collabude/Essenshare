@@ -1,7 +1,7 @@
 /**
  * models/RecipientSession.js
  * Anonymous recipient session management.
- * Session tokens are stored as SHA-256 hashes — raw token is returned once and never stored.
+ * Session tokens are stored as SHA-256 hashes raw token is returned once and never stored.
  * All queries use parameterised placeholders.
  */
 

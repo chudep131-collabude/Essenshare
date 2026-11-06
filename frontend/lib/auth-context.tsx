@@ -8,6 +8,8 @@ interface AuthUser {
   role: string;
   status: string;
   display_name?: string;
+  full_name?: string;
+  email?: string;
 }
 
 interface AuthContextValue {
@@ -37,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(envelope.data.user ?? null);
         }
       } catch {
-        // Not logged in — fine
+        // Not logged in fine
       } finally {
         setLoading(false);
       }
@@ -63,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiPost('/auth/logout', {});
     } catch {
-      // ignore — clear client state regardless
+      // ignore clear client state regardless
     }
     setAccessToken(null);
     setTokenState(null);

@@ -1,5 +1,5 @@
 -- 004_create_refresh_tokens.sql
--- Stores hashed refresh tokens only — raw tokens are never persisted.
+-- Stores hashed refresh tokens only raw tokens are never persisted.
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),

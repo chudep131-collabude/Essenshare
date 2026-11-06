@@ -1,7 +1,7 @@
 /**
  * models/Pickup.js
  * Data-access layer for the pickups table.
- * Pickup codes are stored as SHA-256 hashes — raw code is attached to the returned row once.
+ * Pickup codes are stored as SHA-256 hashes raw code is attached to the returned row once.
  * All queries use parameterised placeholders.
  */
 
@@ -13,20 +13,22 @@ const { pool } = require('../config/database');
 const Pickup = {
   /**
    * Create a new pickup request.
-   * @param {{ donation_id: string, session_id: string|null, donor_user_id: string, requested_qty?: number, expires_at: Date }} opts
+   * Codes expire by donation expiry or default to 24 hours.
+   * @param {{ donation_id: string, session_id: string|null, donor_user_id: string, requested_qty?: number, expires_at?: Date|string }} opts
    * @returns {Promise<object>} Row with rawCode attached (returned once, never stored)
    */
-  async create({ donation_id, session_id, donor_user_id, requested_qty = 1, expires_at }) {
+  async create({ donation_id, session_id, donor_user_id, requested_qty = 1, expires_at, liability_accepted = true }) {
     const rawCode = crypto.randomBytes(32).toString('hex');
     const codeHash = crypto.createHash('sha256').update(rawCode).digest('hex');
     const displayCode = rawCode.slice(0, 8).toUpperCase();
+    const expiry = expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const result = await pool.query(
       `INSERT INTO pickups
-         (donation_id, session_id, donor_user_id, code_hash, display_code, requested_qty, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (donation_id, session_id, donor_user_id, code_hash, display_code, requested_qty, expires_at, liability_accepted_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [donation_id, session_id, donor_user_id, codeHash, displayCode, requested_qty, expires_at]
+      [donation_id, session_id, donor_user_id, codeHash, displayCode, requested_qty, expiry, liability_accepted ? new Date() : null]
     );
 
     const row = result.rows[0];
@@ -43,6 +45,26 @@ const Pickup = {
     const result = await pool.query(
       `SELECT * FROM pickups WHERE code_hash = $1 LIMIT 1`,
       [codeHash]
+    );
+    return result.rows[0] || null;
+  },
+
+  /**
+   * Find a pickup by display code or raw code hash.
+   * Accepts formatted display codes (e.g. "B4C9-E710"), plain codes ("B4C9E710"), or code hash.
+   * @param {string} code
+   * @returns {Promise<object|null>}
+   */
+  async findByCode(code) {
+    if (!code) return null;
+    const cleanDisplay = String(code).trim().replace(/[-\s]/g, '').toUpperCase();
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+    const result = await pool.query(
+      `SELECT * FROM pickups
+       WHERE UPPER(REPLACE(display_code, '-', '')) = $1
+          OR code_hash = $2
+       LIMIT 1`,
+      [cleanDisplay, codeHash]
     );
     return result.rows[0] || null;
   },

@@ -1,6 +1,6 @@
 # EssenShare
 
-EssenShare is a humanitarian food-surplus redistribution platform that connects individual and business donors with local recipients and organisations. Donors list surplus food; recipients browse nearby donations, claim them, and arrange pickup — reducing food waste while fighting food insecurity.
+EssenShare is a humanitarian food-surplus redistribution platform that connects individual and business donors with local recipients and organisations. Donors list surplus food; recipients browse nearby donations, claim them, and arrange pickup reducing food waste while fighting food insecurity.
 
 The platform is built for communities, not corporations. Every listing expires, every pickup is tracked, and every impact is measured.
 
@@ -60,8 +60,8 @@ npm run dev                        # starts on :3000
 | Variable | Description | Example |
 |---|---|---|
 | `DATABASE_URL` | PostgreSQL connection string | `postgres://user:pass@localhost:5432/surplus_dev` |
-| `JWT_SECRET` | HS256 signing secret (32+ chars) | — |
-| `JWT_REFRESH_SECRET` | Refresh token secret (32+ chars) | — |
+| `JWT_SECRET` | HS256 signing secret (32+ chars) | |
+| `JWT_REFRESH_SECRET` | Refresh token secret (32+ chars) | |
 | `PORT` | API server port | `3001` |
 | `NODE_ENV` | Runtime environment | `development` |
 | `ALLOWED_ORIGINS` | CORS origins (comma-separated) | `http://localhost:3000` |
@@ -111,6 +111,6 @@ See `nginx.conf` for the full reverse-proxy configuration.
 | Animation | GSAP | 3 |
 | Backend | Node.js + Express | 18+ / 4.18 |
 | Database | PostgreSQL + PostGIS | 15 |
-| Auth | JWT + httpOnly cookies | — |
+| Auth | JWT + httpOnly cookies | |
 | Process manager | PM2 | latest |
 | Web server | Nginx | latest |

@@ -3,7 +3,7 @@
  * Thin HTTP adapter for donation.service.js.
  * Validates input via Joi schemas, calls service, formats responses.
  *
- * No business logic lives here — only:
+ * No business logic lives here only:
  *  1. Schema validation (exported for route middleware chains)
  *  2. Service call
  *  3. Response formatting
@@ -97,7 +97,7 @@ async function createDonation(req, res, next) {
 
 /**
  * GET /api/v1/donations
- * List active donations — public endpoint.
+ * List active donations public endpoint.
  * Supports optional lat/lng for proximity search.
  */
 async function listDonations(req, res, next) {
@@ -128,7 +128,7 @@ async function listMyDonations(req, res, next) {
 
 /**
  * GET /api/v1/donations/:id
- * Get a single donation by ID — public endpoint.
+ * Get a single donation by ID public endpoint.
  */
 async function getDonation(req, res, next) {
   try {
@@ -170,6 +170,104 @@ async function deleteDonation(req, res, next) {
   }
 }
 
+/**
+ * POST /api/v1/donations/:id/recall
+ * Emergency recall of a donation. Requires auth + donor role or admin.
+ */
+async function recallDonation(req, res, next) {
+  try {
+    const { reason } = req.body || {};
+    const result = await donationService.recallDonation(
+      req.params.id,
+      reason,
+      req.user.sub,
+      req.user.role,
+      req.ip
+    );
+    return success(res, result, 'Donation emergency recall broadcasted.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * PATCH /api/v1/donations/:id/extend
+ * Extend donation pickup deadline. Requires auth + donor role + ownership.
+ */
+async function extendDonation(req, res, next) {
+  try {
+    const { new_deadline } = req.body;
+    const result = await donationService.extendDonation(
+      req.params.id,
+      new_deadline,
+      req.user.sub,
+      req.ip
+    );
+    return success(res, result.donation, 'Donation deadline extended.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * GET /api/v1/donations/:id/images
+ * Get all images for a listing.
+ */
+async function getDonationImages(req, res, next) {
+  try {
+    const images = await donationService.getDonationImages(req.params.id);
+    return success(res, { images }, 'Donation images retrieved.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * POST /api/v1/donations/:id/images
+ * Add an image reference to a donation.
+ */
+async function addDonationImage(req, res, next) {
+  try {
+    const image = await donationService.addDonationImage(
+      req.params.id,
+      req.body,
+      req.user.sub,
+      req.ip
+    );
+    return created(res, { image }, 'Donation image added.');
+  } catch (err) {
+    return next(err);
+  }
+}
+
+/**
+ * DELETE /api/v1/donations/:id/images/:imageId
+ * Remove an image reference from a donation.
+ */
+async function removeDonationImage(req, res, next) {
+  try {
+    await donationService.removeDonationImage(
+      req.params.id,
+      req.params.imageId,
+      req.user.sub,
+      req.ip
+    );
+    return res.status(204).send();
+  } catch (err) {
+    return next(err);
+  }
+}
+
+const extendDonationSchema = Joi.object({
+  new_deadline: Joi.date().iso().greater('now').required(),
+});
+
+const addImageSchema = Joi.object({
+  url: Joi.string().uri().required(),
+  alt_text: Joi.string().max(200).allow('', null).optional(),
+  display_order: Joi.number().integer().min(0).max(4).optional(),
+});
+
 module.exports = {
   // Handlers
   createDonation,
@@ -178,9 +276,16 @@ module.exports = {
   getDonation,
   updateDonation,
   deleteDonation,
+  recallDonation,
+  extendDonation,
+  getDonationImages,
+  addDonationImage,
+  removeDonationImage,
   // Schemas
   createDonationSchema,
   updateDonationSchema,
   listDonationsQuerySchema,
   myListingsQuerySchema,
+  extendDonationSchema,
+  addImageSchema,
 };

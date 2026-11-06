@@ -108,12 +108,7 @@ export default function AdminDashboardPage() {
 
       {fetchLoading ? (
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 'var(--space-m)',
-          }}
-          className="stat-grid"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[var(--space-m)]"
           aria-busy="true"
           aria-label="Loading dashboard statistics"
         >
@@ -128,20 +123,10 @@ export default function AdminDashboardPage() {
               aria-hidden="true"
             />
           ))}
-          <style>{`
-            @media (max-width: 767px) {
-              .stat-grid { grid-template-columns: repeat(2, 1fr) !important; }
-            }
-          `}</style>
         </div>
       ) : data ? (
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 'var(--space-m)',
-          }}
-          className="stat-grid"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[var(--space-m)]"
         >
           {STAT_TILES.map((tile) => {
             const value = data[tile.key];

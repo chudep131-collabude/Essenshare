@@ -1,6 +1,6 @@
 /**
  * routes/auth.routes.js
- * Authentication routes — Phase 2 real implementation.
+ * Authentication routes Phase 2 real implementation.
  * All validation uses validateBody() from middleware/validate.js.
  */
 
@@ -19,6 +19,7 @@ const {
   forgotPassword,
   resetPassword,
   resendVerification,
+  createRecipientSession,
   registerSchema,
   loginSchema,
   verifyEmailSchema,
@@ -26,6 +27,9 @@ const {
   resetPasswordSchema,
   resendVerificationSchema,
 } = require('../controllers/auth.controller');
+
+// POST /api/v1/auth/sessions (anonymous recipient session creation)
+router.post('/sessions', createRecipientSession);
 
 // POST /api/v1/auth/register
 router.post('/register', authLimiter, validateBody(registerSchema), register);

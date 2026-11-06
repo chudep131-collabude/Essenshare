@@ -116,6 +116,7 @@ export default function AdminUsersPage() {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [suspendingId, setSuspendingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const LIMIT = 20;
 
@@ -159,6 +160,7 @@ export default function AdminUsersPage() {
   const handleSuspend = async (userId: string) => {
     if (!window.confirm('Suspend this user?')) return;
     setSuspendingId(userId);
+    setActionError(null);
     try {
       await apiFetch(`/admin/users/${userId}/status`, {
         method: 'PATCH',
@@ -166,7 +168,7 @@ export default function AdminUsersPage() {
       });
       await fetchUsers();
     } catch (err) {
-      alert(err instanceof ApiException ? err.message : 'Failed to suspend user.');
+      setActionError(err instanceof ApiException ? err.message : 'Failed to suspend user.');
     } finally {
       setSuspendingId(null);
     }
@@ -308,6 +310,11 @@ export default function AdminUsersPage() {
       {error && (
         <div style={{ marginBottom: 'var(--space-l)' }}>
           <Alert type="error">{error}</Alert>
+        </div>
+      )}
+      {actionError && (
+        <div style={{ marginBottom: 'var(--space-l)' }}>
+          <Alert type="error">{actionError}</Alert>
         </div>
       )}
 

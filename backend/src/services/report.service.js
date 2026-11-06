@@ -1,7 +1,7 @@
 /**
  * services/report.service.js
  * Business logic for safety reports.
- * Framework-agnostic — no Express imports.
+ * Framework-agnostic no Express imports.
  * AuditLog.create is always fire-and-forget (never awaited).
  */
 'use strict';
@@ -31,11 +31,23 @@ const CATEGORY_SEVERITY = {
   WRONG_DESCRIPTION:    'MEDIUM',
   ALREADY_GONE:         'MEDIUM',
   OTHER:                'LOW',
+  // Client aliases
+  SAFETY_CONCERN:       'CRITICAL',
+  INCORRECT_INFO:       'MEDIUM',
+  ALREADY_CLAIMED:      'MEDIUM',
+  SPAM:                 'LOW',
+};
+
+const CATEGORY_NORMALIZATION = {
+  SAFETY_CONCERN:   'UNSAFE_FOOD',
+  INCORRECT_INFO:   'WRONG_DESCRIPTION',
+  ALREADY_CLAIMED:  'ALREADY_GONE',
+  SPAM:             'OTHER',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // submitReport
-// Public — no authentication required. Rate-limited by IP via DB query.
+// Public no authentication required. Rate-limited by IP via DB query.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -46,9 +58,12 @@ const CATEGORY_SEVERITY = {
  * @returns {Promise<{ report_id: string, message: string }>}
  */
 async function submitReport(data, rawSessionToken, ipAddress) {
-  const { donation_id, category, description } = data;
+  const donation_id = data.donation_id;
+  const rawCategory = data.category;
+  const category = CATEGORY_NORMALIZATION[rawCategory] || rawCategory;
+  const description = data.description;
 
-  // 1. IP rate limit — max 5 reports per IP per hour
+  // 1. IP rate limit max 5 reports per IP per hour
   if (ipAddress) {
     const rateResult = await pool.query(
       `SELECT COUNT(*) AS count
@@ -77,9 +92,23 @@ async function submitReport(data, rawSessionToken, ipAddress) {
 
   // 3. Derive severity from category
   const severity = CATEGORY_SEVERITY[category] || 'LOW';
-  const auto_hidden = severity === 'CRITICAL' || severity === 'HIGH';
+  let auto_hidden = severity === 'CRITICAL';
 
-  // 4. Resolve reporter session (optional — reports allowed without a session)
+  // Auto-hide on 2+ SPOILED_OR_EXPIRED reports within 24 hours
+  if (!auto_hidden && category === 'SPOILED_OR_EXPIRED') {
+    const recentReports = await pool.query(
+      `SELECT COUNT(*) AS count FROM reports
+       WHERE donation_id = $1
+         AND category = 'SPOILED_OR_EXPIRED'
+         AND created_at > NOW() - INTERVAL '24 hours'`,
+      [donation_id]
+    );
+    if (parseInt(recentReports.rows[0].count, 10) >= 1) {
+      auto_hidden = true;
+    }
+  }
+
+  // 4. Resolve reporter session (optional reports allowed without a session)
   let reporter_session_id = null;
   if (rawSessionToken) {
     const session = await RecipientSession.findByToken(rawSessionToken);
@@ -88,7 +117,7 @@ async function submitReport(data, rawSessionToken, ipAddress) {
     }
   }
 
-  // 5. Auto-hide the donation if severity warrants it
+  // 5. Auto-hide the donation if severity or threshold warrants it
   if (auto_hidden) {
     await pool.query(
       `UPDATE donations SET status = 'HIDDEN', updated_at = NOW()
@@ -108,7 +137,7 @@ async function submitReport(data, rawSessionToken, ipAddress) {
     ip_address: ipAddress || null,
   });
 
-  // 7. Audit (fire-and-forget — no PII)
+  // 7. Audit (fire-and-forget no PII)
   AuditLog.create({
     user_id:    null,
     action:     'REPORT_SUBMITTED',
@@ -125,7 +154,7 @@ async function submitReport(data, rawSessionToken, ipAddress) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// listReports — admin only (enforced at route level)
+// listReports admin only (enforced at route level)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -139,7 +168,7 @@ async function listReports({ status, severity, page = 1, limit = 20 } = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// resolveReport — admin only (enforced at route level)
+// resolveReport admin only (enforced at route level)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -171,7 +200,7 @@ async function resolveReport(report_id, data, adminUserId, ipAddress) {
     status:           data.status,
     resolved_by:      adminUserId,
     resolved_at:      new Date(),
-    resolution_notes: data.resolution_notes || null,
+    resolution_notes: data.resolution_notes || data.notes || null,
   });
 
   // 4. Optionally restore the donation if it was auto-hidden
@@ -188,7 +217,7 @@ async function resolveReport(report_id, data, adminUserId, ipAddress) {
     );
   }
 
-  // 5. Audit (fire-and-forget — no PII)
+  // 5. Audit (fire-and-forget no PII)
   AuditLog.create({
     user_id:    adminUserId,
     action:     'REPORT_RESOLVED',

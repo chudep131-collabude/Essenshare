@@ -1,7 +1,7 @@
 /**
  * models/Report.js
  * Data-access layer for the reports table.
- * All queries use parameterised placeholders — no string concatenation of user input.
+ * All queries use parameterised placeholders no string concatenation of user input.
  */
 'use strict';
 

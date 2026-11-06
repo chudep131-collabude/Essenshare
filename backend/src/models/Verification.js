@@ -1,7 +1,7 @@
 /**
  * models/Verification.js
  * Data-access methods for the verifications table.
- * Only SHA-256 hashes of OTP codes are stored — raw codes are never persisted.
+ * Only SHA-256 hashes of OTP codes are stored raw codes are never persisted.
  * All queries use parameterised placeholders.
  */
 

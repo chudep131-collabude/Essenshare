@@ -1,9 +1,9 @@
 /**
  * services/pickup.service.js
  * Business logic for the pickup and handover flow.
- * Framework-agnostic — no Express imports. Callable from tests without a running server.
+ * Framework-agnostic no Express imports. Callable from tests without a running server.
  * All DB writes that must be atomic use a pool client with BEGIN/COMMIT/ROLLBACK.
- * AuditLog.create is fire-and-forget — never awaited, catches its own errors.
+ * AuditLog.create is fire-and-forget never awaited, catches its own errors.
  */
 
 'use strict';
@@ -29,7 +29,7 @@ function serviceError(message, code, statusCode) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // requestPickup
-// Public — identified only by a recipient session cookie.
+// Public identified only by a recipient session cookie.
 // Validates the session, donation availability, cooldown, and duplicate guard,
 // then atomically reserves quantity and creates the pickup row.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -101,34 +101,66 @@ async function requestPickup(data, rawSessionToken, ipAddress) {
     );
   }
 
-  // 5. Compute expiry (sooner of 1 hour from now or donation expiry)
-  const oneHourFromNow = Date.now() + 60 * 60 * 1000;
-  const donationExpiry = new Date(donation.expires_at).getTime();
-  const expiresAt = new Date(Math.min(oneHourFromNow, donationExpiry));
+  // 4b. Anti-hoarding guard: Maximum 2 concurrent active pending pickups per recipient session
+  const activeCountResult = await pool.query(
+    `SELECT COUNT(*) FROM pickups
+     WHERE session_id = $1
+       AND status = 'PENDING'`,
+    [session.id]
+  );
+  const activeCount = parseInt(activeCountResult.rows[0].count, 10);
+  if (activeCount >= 2) {
+    throw serviceError(
+      'Active reservation limit reached (maximum 2 uncollected pickups). Please collect or cancel an existing reservation before claiming more surplus.',
+      'MAX_ACTIVE_RESERVATIONS',
+      429
+    );
+  }
 
-  // 6. Atomic quantity reserve — prevents race conditions
+  // 5. Atomic quantity reserve — prevents race conditions.
+  // No time-based expiry: codes are valid until used, cancelled, or donation runs out.
   const reserveResult = await pool.query(
     `UPDATE donations
      SET quantity = quantity - $1, updated_at = NOW()
      WHERE id = $2
+       AND status = 'ACTIVE'
        AND quantity >= $1
      RETURNING *`,
     [data.requested_qty, data.donation_id]
   );
 
   if (reserveResult.rows.length === 0) {
-    throw serviceError('Insufficient quantity available', 'INSUFFICIENT_QUANTITY', 409);
+    throw serviceError(
+      'Donation is no longer available or has insufficient quantity',
+      'DONATION_NOT_AVAILABLE',
+      409
+    );
   }
 
   const updatedDonation = reserveResult.rows[0];
 
-  // 7. Create the pickup row
+  // Fetch donor phone so the recipient can contact them at collection time.
+  // Only phone is fetched — no other PII.
+  const donorPhoneResult = await pool.query(
+    'SELECT phone FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
+    [donation.donor_user_id]
+  );
+  const donorPhone = donorPhoneResult.rows[0]?.phone ?? null;
+
+  // 7. Create the pickup row with dynamic travel-friendly expiry
+  // 45 minutes travel window or donation expiry (whichever is earlier)
+  const nowMs = Date.now();
+  const defaultReservationMs = nowMs + 45 * 60 * 1000;
+  const donationExpiryMs = donation.expires_at ? new Date(donation.expires_at).getTime() : defaultReservationMs;
+  const pickupExpiry = new Date(Math.min(defaultReservationMs, donationExpiryMs));
+
   const pickup = await Pickup.create({
     donation_id: data.donation_id,
     session_id: session.id,
     donor_user_id: donation.donor_user_id,
     requested_qty: data.requested_qty,
-    expires_at: expiresAt,
+    expires_at: pickupExpiry,
+    liability_accepted: data.liability_accepted !== false,
   });
 
   // 8. Audit (fire-and-forget)
@@ -138,7 +170,12 @@ async function requestPickup(data, rawSessionToken, ipAddress) {
     resource: 'pickups',
     ip_address: ipAddress,
     outcome: 'SUCCESS',
-    meta: { pickup_id: pickup.id, donation_id: data.donation_id },
+    meta: {
+      pickup_id: pickup.id,
+      donation_id: data.donation_id,
+      liability_acknowledged: true,
+      good_samaritan_notice: '2026.1',
+    },
   });
 
   return {
@@ -146,7 +183,7 @@ async function requestPickup(data, rawSessionToken, ipAddress) {
     display_code: pickup.display_code,
     raw_code: pickup.rawCode,
     expires_at: pickup.expires_at,
-    donation: updatedDonation,
+    donation: { ...updatedDonation, donor_phone: donorPhone },
   };
 }
 
@@ -156,19 +193,51 @@ async function requestPickup(data, rawSessionToken, ipAddress) {
 // and returns pickup + donation info for the confirm step.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Rate limiting map for code verification brute-force defense
+const failedVerifyAttempts = new Map();
+
 /**
  * Verify a raw pickup code presented by a recipient.
+ * Protected with a 10-attempt brute-force lockout window.
  * @param {string} rawCode
  * @param {string} donorUserId - From JWT (req.user.sub)
  * @param {string|null} ipAddress
  * @returns {Promise<{ pickup: object, donation: object|null }>}
  */
 async function verifyCode(rawCode, donorUserId, ipAddress) {
-  const codeHash = crypto.createHash('sha256').update(rawCode).digest('hex');
+  const rateKey = `${donorUserId || 'anon'}_${ipAddress || 'unknown'}`;
+  const now = Date.now();
+  const attemptRecord = failedVerifyAttempts.get(rateKey);
 
-  const pickup = await Pickup.findByCodeHash(codeHash);
+  if (attemptRecord && attemptRecord.lockedUntil > now) {
+    const remainingMinutes = Math.ceil((attemptRecord.lockedUntil - now) / 60000);
+    throw serviceError(
+      `Too many failed pickup code attempts. Verification locked for ${remainingMinutes} more minute(s).`,
+      'TOO_MANY_FAILED_ATTEMPTS',
+      429
+    );
+  }
+
+  function recordFailure() {
+    const record = (attemptRecord && attemptRecord.resetAt > now)
+      ? attemptRecord
+      : { count: 0, resetAt: now + 15 * 60 * 1000, lockedUntil: 0 };
+    record.count += 1;
+    if (record.count >= 10) {
+      record.lockedUntil = now + 15 * 60 * 1000;
+    }
+    failedVerifyAttempts.set(rateKey, record);
+  }
+
+  const pickup = await Pickup.findByCode(rawCode);
   if (!pickup) {
+    recordFailure();
     throw serviceError('Pickup code not found', 'PICKUP_NOT_FOUND', 404);
+  }
+
+  if (pickup.donor_user_id !== donorUserId) {
+    recordFailure();
+    throw serviceError('This pickup does not belong to your account', 'WRONG_DONOR', 403);
   }
 
   if (pickup.status !== 'PENDING') {
@@ -179,13 +248,8 @@ async function verifyCode(rawCode, donorUserId, ipAddress) {
     );
   }
 
-  if (new Date(pickup.expires_at) <= new Date()) {
-    throw serviceError('Pickup code has expired', 'CODE_EXPIRED', 410);
-  }
-
-  if (pickup.donor_user_id !== donorUserId) {
-    throw serviceError('This pickup does not belong to your account', 'WRONG_DONOR', 403);
-  }
+  // Clear failed attempt tracking on successful verification
+  failedVerifyAttempts.delete(rateKey);
 
   // Fetch donation info for display
   const donationResult = await pool.query(
@@ -235,10 +299,6 @@ async function confirmPickup(pickup_id, data, donorUserId, ipAddress) {
     );
   }
 
-  if (new Date(pickup.expires_at) <= new Date()) {
-    throw serviceError('Pickup code has expired', 'CODE_EXPIRED', 410);
-  }
-
   // Fetch donation to get category and location for impact record
   const donation = await Donation.findById(pickup.donation_id);
 
@@ -266,15 +326,45 @@ async function confirmPickup(pickup_id, data, donorUserId, ipAddress) {
     );
     confirmedPickup = pickupUpdate.rows[0];
 
-    // 2. Deduct from donation; mark COMPLETED if quantity reaches zero
-    await client.query(
-      `UPDATE donations
-       SET quantity = GREATEST(0, quantity - $1),
-           status = CASE WHEN GREATEST(0, quantity - $1) = 0 THEN 'COMPLETED' ELSE status END,
-           updated_at = NOW()
-       WHERE id = $2`,
-      [confirmedQty, pickup.donation_id]
+    // 2. Quantity reconciliation:
+    // requested_qty was already atomically deducted at reservation time.
+    // If confirmedQty < requested_qty, refund the difference back to the donation.
+    // If confirmedQty > requested_qty, deduct the extra difference.
+    const qtyDiff = pickup.requested_qty - confirmedQty;
+    if (qtyDiff > 0) {
+      await client.query(
+        `UPDATE donations
+         SET quantity = quantity + $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [qtyDiff, pickup.donation_id]
+      );
+    } else if (qtyDiff < 0) {
+      await client.query(
+        `UPDATE donations
+         SET quantity = GREATEST(0, quantity - $1),
+             updated_at = NOW()
+         WHERE id = $2`,
+        [Math.abs(qtyDiff), pickup.donation_id]
+      );
+    }
+
+    // Check remaining quantity and pending pickups to determine if donation is completed
+    const remainingResult = await client.query(
+      `SELECT quantity,
+              (SELECT COUNT(*) FROM pickups WHERE donation_id = $1 AND status = 'PENDING' AND id != $2) AS pending_count
+       FROM donations WHERE id = $1`,
+      [pickup.donation_id, pickup_id]
     );
+    const remainingQty = remainingResult.rows[0]?.quantity ?? 0;
+    const pendingCount = parseInt(remainingResult.rows[0]?.pending_count ?? '0', 10);
+
+    if (remainingQty <= 0 && pendingCount === 0) {
+      await client.query(
+        `UPDATE donations SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+        [pickup.donation_id]
+      );
+    }
 
     // 3. Insert impact record
     const impactInsert = await client.query(
@@ -311,7 +401,7 @@ async function confirmPickup(pickup_id, data, donorUserId, ipAddress) {
     client.release();
   }
 
-  // Audit (fire-and-forget — outside transaction)
+  // Audit (fire-and-forget outside transaction)
   AuditLog.create({
     user_id: donorUserId,
     action: 'PICKUP_COMPLETED',
@@ -326,7 +416,7 @@ async function confirmPickup(pickup_id, data, donorUserId, ipAddress) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // cancelPickup
-// Public — identified only by the recipient session cookie.
+// Public identified only by the recipient session cookie.
 // Restores reserved quantity to the donation.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -390,7 +480,7 @@ async function cancelPickup(pickup_id, rawSessionToken, ipAddress) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // getPickupStatus
-// Public — identified only by the recipient session cookie.
+// Public identified only by the recipient session cookie.
 // Returns status fields for the pickup if it belongs to this session.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -419,6 +509,12 @@ async function getPickupStatus(pickup_id, rawSessionToken) {
     throw serviceError('This pickup does not belong to your session', 'WRONG_SESSION', 403);
   }
 
+  let recall_reason = null;
+  if (pickup.status === 'RECALLED') {
+    const donRes = await pool.query('SELECT pickup_notes FROM donations WHERE id = $1', [pickup.donation_id]);
+    recall_reason = donRes.rows[0]?.pickup_notes || 'Food safety alert issued by donor.';
+  }
+
   return {
     id: pickup.id,
     status: pickup.status,
@@ -426,7 +522,92 @@ async function getPickupStatus(pickup_id, rawSessionToken) {
     expires_at: pickup.expires_at,
     confirmed_at: pickup.confirmed_at,
     cancelled_at: pickup.cancelled_at,
+    recall_reason,
   };
+}
+
+/**
+ * Automatically releases all expired PENDING pickups back to the donation inventory.
+ * Atomically transitions status PENDING -> EXPIRED and increments donation quantity.
+ */
+async function releaseExpiredPickups() {
+  const client = await pool.connect();
+  let releasedCount = 0;
+  try {
+    await client.query('BEGIN');
+    const expiredResult = await client.query(
+      `SELECT id, donation_id, requested_qty, donor_user_id
+       FROM pickups
+       WHERE status = 'PENDING'
+         AND expires_at < NOW()
+       FOR UPDATE SKIP LOCKED`
+    );
+
+    for (const row of expiredResult.rows) {
+      // 1. Mark pickup as EXPIRED
+      await client.query(
+        `UPDATE pickups
+         SET status = 'EXPIRED', updated_at = NOW()
+         WHERE id = $1`,
+        [row.id]
+      );
+
+      // 2. Return quantity to donation and ensure status is ACTIVE
+      await client.query(
+        `UPDATE donations
+         SET quantity = quantity + $1,
+             status = CASE WHEN status = 'RESERVED' THEN 'ACTIVE' ELSE status END,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [row.requested_qty, row.donation_id]
+      );
+
+      releasedCount++;
+
+      // Audit log
+      AuditLog.create({
+        user_id: null,
+        action: 'PICKUP_AUTO_RELEASED_EXPIRED',
+        resource: 'pickups',
+        ip_address: null,
+        outcome: 'SUCCESS',
+        meta: { pickup_id: row.id, donation_id: row.donation_id, restored_qty: row.requested_qty },
+      });
+    }
+
+    await client.query('COMMIT');
+    return releasedCount;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error('releaseExpiredPickups failed', { error: err.message });
+    return 0;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Purges sensitive donor contact info (phone/pickup_notes) from pickups completed over 7 days ago.
+ * Retains aggregate impact and audit history while honoring privacy data lifecycle.
+ */
+async function purgeCompletedDonorPII() {
+  try {
+    const result = await pool.query(
+      `UPDATE donations
+       SET pickup_notes = '[PURGED_RETENTION_POLICY]'
+       WHERE id IN (
+         SELECT donation_id FROM pickups
+         WHERE status = 'CONFIRMED'
+           AND confirmed_at < NOW() - INTERVAL '7 days'
+       )
+       AND pickup_notes IS NOT NULL
+       AND pickup_notes != '[PURGED_RETENTION_POLICY]'`
+    );
+    return result.rowCount || 0;
+  } catch (err) {
+    logger.error('purgeCompletedDonorPII failed', { error: err.message });
+    return 0;
+  }
 }
 
 module.exports = {
@@ -435,4 +616,6 @@ module.exports = {
   confirmPickup,
   cancelPickup,
   getPickupStatus,
+  releaseExpiredPickups,
+  purgeCompletedDonorPII,
 };

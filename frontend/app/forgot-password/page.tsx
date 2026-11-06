@@ -5,7 +5,7 @@
  * Step 1 of password reset: user enters their email.
  *
  * The backend always returns the same success message whether the email
- * exists or not (enumeration prevention). We reflect that here — the user
+ * exists or not (enumeration prevention). We reflect that here the user
  * sees a confirmation regardless and is instructed to check their email.
  */
 
@@ -21,6 +21,7 @@ const inputClass =
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +32,13 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
     try {
-      await apiPost('/auth/forgot-password', { email });
+      const res = await apiPost<{ dev_otp?: string }>('/auth/forgot-password', { email });
+      if (res.data?.dev_otp) {
+        setDevOtp(res.data.dev_otp);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('dev_reset_otp', res.data.dev_otp);
+        }
+      }
       setSubmitted(true);
     } catch (err) {
       if (err instanceof ApiException) {
@@ -66,12 +73,25 @@ export default function ForgotPasswordPage() {
           >
             Check your email
           </h1>
-          <p className="text-ink-muted text-sm leading-relaxed mb-8">
+          <p className="text-ink-muted text-sm leading-relaxed mb-6">
             If an account exists with that address, we have sent a 6-digit reset
             code. It is valid for 15 minutes.
           </p>
+
+          {devOtp && (
+            <div className="mb-6 p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-xs text-left">
+              <div className="flex items-center gap-1.5 font-semibold text-emerald-800 dark:text-emerald-300 mb-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Local Testing Mode
+              </div>
+              <p className="text-ink-muted">
+                Your password reset code: <strong className="font-mono text-ink text-sm tracking-widest">{devOtp}</strong>
+              </p>
+            </div>
+          )}
+
           <Link
-            href="/reset-password"
+            href={devOtp ? `/reset-password?dev_otp=${encodeURIComponent(devOtp)}` : '/reset-password'}
             className="inline-flex items-center justify-center px-6 py-3 rounded-md font-semibold text-sm mb-4"
             style={{
               background: 'var(--accent)',

@@ -51,13 +51,13 @@ function validateEnv() {
   }
 
   if (warnings.length > 0) {
-    // Log key names only — never values
+    // Log key names only never values
     console.warn(
       `[config/env] WARNING: Missing env vars (using defaults for dev): ${warnings.join(', ')}`
     );
   }
 
-  // Log which keys are present — never log values
+  // Log which keys are present never log values
   const presentKeys = REQUIRED_VARS.filter((k) => !!process.env[k]);
   console.log(`[config/env] Keys present: ${presentKeys.join(', ')}`);
 }

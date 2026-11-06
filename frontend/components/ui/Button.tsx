@@ -45,7 +45,7 @@ export default function Button({
   'aria-label': ariaLabel,
 }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center font-semibold rounded-pill border transition-all duration-[var(--dur-fast)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-3 disabled:opacity-50 disabled:pointer-events-none';
+    'inline-flex items-center justify-center font-rounded font-semibold rounded-pill border transition-all duration-[var(--dur-fast)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-3 disabled:opacity-50 disabled:pointer-events-none';
   const classes = cn(base, variantStyles[variant], sizeStyles[size], className);
 
   if (href) {

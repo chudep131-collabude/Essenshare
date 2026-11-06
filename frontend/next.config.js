@@ -7,19 +7,21 @@ let apiOrigin;
 try {
   apiOrigin = new URL(apiUrl).origin;
 } catch {
-  // Malformed URL — fall back safely
+  // Malformed URL fall back safely
   apiOrigin = 'http://localhost:3001';
 }
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 const nextConfig = {
   images: {
-    unoptimized: false,
+    unoptimized: isDev,
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
 
-  // Security headers on all responses (SOC 2 — Confidentiality / Transport Security)
+  // Security headers on all responses (SOC 2 Confidentiality / Transport Security)
   async headers() {
     return [
       {
@@ -34,10 +36,11 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self'",
-              `connect-src 'self' ${apiOrigin}`,
+              "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+              "img-src 'self' data: blob: https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://server.arcgisonline.com https://*.basemaps.cartocdn.com https://api.mapbox.com https://*.mapbox.com https://cdnjs.cloudflare.com",
+              "font-src 'self' data: https://cdnjs.cloudflare.com",
+              `connect-src 'self' ${apiOrigin} https://api.mapbox.com https://*.mapbox.com https://events.mapbox.com https://router.project-osrm.org`,
+              "worker-src 'self' blob:",
               "frame-ancestors 'none'",
             ].join('; '),
           },

@@ -1,7 +1,7 @@
 /**
  * services/auth.service.js
  * Core authentication business logic.
- * Framework-agnostic — no Express imports.
+ * Framework-agnostic no Express imports.
  *
  * Security rules enforced here:
  *  - Passwords hashed with bcrypt cost factor 12.
@@ -45,7 +45,7 @@ function generateOtp() {
 
 /**
  * Hash a value with SHA-256.
- * Used for both OTP codes and refresh tokens — raw values are never stored.
+ * Used for both OTP codes and refresh tokens raw values are never stored.
  */
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
@@ -77,6 +77,7 @@ async function issueTokenPair(user, ipAddress, userAgent) {
   const tokenPayload = {
     sub: user.id,
     role: user.role,
+    status: user.status,
     email_verified: user.email_verified,
   };
 
@@ -121,7 +122,7 @@ function serviceError(message, code, statusCode) {
 /**
  * Register a new user.
  * Creates the user row and the role-specific profile row atomically
- * inside a single DB transaction — neither row is committed unless both succeed.
+ * inside a single DB transaction neither row is committed unless both succeed.
  * Sends an email verification OTP after the transaction commits.
  *
  * @param {object} data - { email, password, role, full_name, phone, country_code, org_name, business_name }
@@ -136,10 +137,55 @@ async function register(data, ipAddress) {
     throw serviceError('org_name is required for ORGANIZATION role.', 'ORG_NAME_REQUIRED', 400);
   }
 
-  // Check if email is already taken (outside transaction — read-only, no lock needed)
-  const existing = await User.findByEmail(email);
+  // Check if email is already taken (outside transaction read-only, no lock needed)
+  const normalizedEmail = email ? email.toLowerCase().trim() : '';
+  const existing = await User.findByEmail(normalizedEmail);
   if (existing) {
-    throw serviceError('An account with this email address already exists.', 'EMAIL_TAKEN', 409);
+    if (!existing.email_verified) {
+      // The user previously started registration but has not completed email verification.
+      // Update their password and profile, issue a fresh OTP, and return dev_otp so they can verify.
+      const passwordHash = await bcrypt.hash(password, 12);
+      await User.updateById(existing.id, {
+        password_hash: passwordHash,
+        full_name: full_name || existing.full_name,
+        phone: phone || existing.phone,
+        country_code: country_code || existing.country_code,
+      });
+
+      const otp     = generateOtp();
+      const otpHash = sha256(otp);
+      const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+      await Verification.create({
+        user_id:    existing.id,
+        type:       'EMAIL_VERIFICATION',
+        code_hash:  otpHash,
+        expires_at: expires,
+      });
+
+      try {
+        await emailService.sendVerificationEmail(existing.email, otp, full_name || existing.full_name);
+      } catch (emailErr) {
+        logger.error('auth.service: verification email failed to dispatch', { userId: existing.id, error: emailErr.message });
+      }
+
+      await AuditLog.create({
+        user_id:    existing.id,
+        action:     'USER_REGISTER_RESUME',
+        resource:   'users',
+        ip_address: ipAddress,
+        outcome:    'SUCCESS',
+      });
+
+      const { password_hash: _, ...safeUser } = { ...existing, full_name: full_name || existing.full_name };
+      const result = { user: safeUser };
+      if (config.isDev) {
+        result.dev_otp = otp;
+      }
+      return result;
+    }
+
+    throw serviceError('An account with this email address already exists. Try signing in instead.', 'EMAIL_TAKEN', 409);
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -151,7 +197,7 @@ async function register(data, ipAddress) {
   try {
     await client.query('BEGIN');
 
-    // INSERT user row — parameterised, never log email value
+    // INSERT user row parameterised, never log email value
     const userResult = await client.query(
       `INSERT INTO users (email, password_hash, role, full_name, phone, country_code)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -161,11 +207,18 @@ async function register(data, ipAddress) {
     user = userResult.rows[0];
 
     // INSERT role-specific profile row
+    const safetyAccepted = data.safety_accepted !== false;
     if (role === 'INDIVIDUAL_DONOR' || role === 'BUSINESS_DONOR') {
       await client.query(
-        `INSERT INTO donors (user_id, display_name, business_name)
-         VALUES ($1, $2, $3)`,
-        [user.id, full_name || null, business_name || null]
+        `INSERT INTO donors (user_id, display_name, business_name, safety_agreement_accepted_at, safety_agreement_version)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          user.id,
+          full_name || null,
+          business_name || null,
+          safetyAccepted ? new Date() : null,
+          safetyAccepted ? '1.0' : null,
+        ]
       );
     } else if (role === 'ORGANIZATION') {
       await client.query(
@@ -185,7 +238,7 @@ async function register(data, ipAddress) {
 
   logger.info('auth.service: user created', { userId: user.id, role });
 
-  // Generate and store OTP (only hash stored) — outside transaction; email is now committed
+  // Generate and store OTP (only hash stored) outside transaction; email is now committed
   const otp     = generateOtp();
   const otpHash = sha256(otp);
   const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -197,8 +250,12 @@ async function register(data, ipAddress) {
     expires_at: expires,
   });
 
-  // Send email — never log email address or otp value
-  await emailService.sendVerificationEmail(user.email, otp, user.full_name);
+  // Send email — safely catch dispatch errors so committed account creation is not aborted
+  try {
+    await emailService.sendVerificationEmail(user.email, otp, user.full_name);
+  } catch (emailErr) {
+    logger.error('auth.service: verification email failed to dispatch', { userId: user.id, error: emailErr.message });
+  }
 
   await AuditLog.create({
     user_id:    user.id,
@@ -210,7 +267,11 @@ async function register(data, ipAddress) {
 
   // Strip sensitive fields before returning
   const { password_hash: _, ...safeUser } = user;
-  return { user: safeUser };
+  const result = { user: safeUser };
+  if (config.isDev) {
+    result.dev_otp = otp;
+  }
+  return result;
 }
 
 /**
@@ -270,7 +331,7 @@ async function login(data, ipAddress, userAgent) {
 }
 
 /**
- * Rotate refresh tokens — validates the incoming raw refresh token,
+ * Rotate refresh tokens validates the incoming raw refresh token,
  * revokes it, and issues a new pair.
  *
  * @param {string} rawRefreshToken
@@ -314,7 +375,7 @@ async function refreshTokens(rawRefreshToken, ipAddress, userAgent) {
 }
 
 /**
- * Logout — revokes the provided refresh token.
+ * Logout revokes the provided refresh token.
  *
  * @param {string} rawRefreshToken
  * @returns {Promise<void>}
@@ -338,7 +399,7 @@ async function logout(rawRefreshToken) {
       });
     }
   } catch {
-    // Non-fatal — logout still succeeds even if audit log fails
+    // Non-fatal logout still succeeds even if audit log fails
   }
 }
 
@@ -386,7 +447,7 @@ async function verifyEmail(data, ipAddress) {
 }
 
 /**
- * Initiate password reset — looks up user by email, generates OTP, sends email.
+ * Initiate password reset looks up user by email, generates OTP, sends email.
  * Returns the SAME response whether or not the email exists (enumeration prevention).
  *
  * @param {string} email
@@ -395,6 +456,7 @@ async function verifyEmail(data, ipAddress) {
  */
 async function initiatePasswordReset(email, ipAddress) {
   const user = await User.findByEmail(email);
+  let devOtp;
 
   if (user) {
     const otp     = generateOtp();
@@ -409,7 +471,11 @@ async function initiatePasswordReset(email, ipAddress) {
     });
 
     // Never log email address or otp value
-    await emailService.sendPasswordResetEmail(user.email, otp, user.full_name);
+    try {
+      await emailService.sendPasswordResetEmail(user.email, otp, user.full_name);
+    } catch (emailErr) {
+      logger.error('auth.service: password reset email failed to dispatch', { userId: user.id, error: emailErr.message });
+    }
 
     logger.info('auth.service: password reset initiated', { userId: user.id });
 
@@ -420,8 +486,13 @@ async function initiatePasswordReset(email, ipAddress) {
       ip_address: ipAddress,
       outcome:    'SUCCESS',
     });
+
+    if (config.isDev) {
+      devOtp = otp;
+    }
   }
-  // If user not found we do nothing — same response to caller either way
+  // Return dev_otp in development mode if user exists, otherwise empty object (preserving enumeration prevention in prod)
+  return config.isDev && devOtp ? { dev_otp: devOtp } : {};
 }
 
 /**
@@ -446,7 +517,7 @@ async function resetPassword(data, ipAddress) {
   await User.updateById(record.user_id, { password_hash: newHash });
   await Verification.markUsed(record.id);
 
-  // Revoke all existing refresh tokens — force re-login
+  // Revoke all existing refresh tokens force re-login
   await RefreshToken.revokeAllForUser(record.user_id);
 
   logger.info('auth.service: password reset completed', { userId: record.user_id });
@@ -503,9 +574,14 @@ async function resendVerification(userId, ipAddress) {
     expires_at: expires,
   });
 
-  await emailService.sendVerificationEmail(user.email, otp, user.full_name);
+  try {
+    await emailService.sendVerificationEmail(user.email, otp, user.full_name);
+  } catch (emailErr) {
+    logger.error('auth.service: resend verification email failed to dispatch', { userId, error: emailErr.message });
+  }
 
   logger.info('auth.service: verification resent', { userId });
+  return config.isDev ? { dev_otp: otp } : {};
 }
 
 module.exports = {

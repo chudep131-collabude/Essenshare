@@ -1,19 +1,21 @@
 /**
  * middleware/rateLimit.js
  * Two rate limiters:
- *   generalLimiter — 100 req / 15 min per IP
- *   authLimiter    — 10 req  / 15 min per IP (for auth routes)
+ *   generalLimiter 100 req / 15 min per IP
+ *   authLimiter    10 req  / 15 min per IP (for auth routes)
  */
 
 'use strict';
 
 const rateLimit = require('express-rate-limit');
+const config = require('../config/env');
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: config.isDev ? 1000 : 100,
   standardHeaders: true,  // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again after 15 minutes.',
@@ -26,9 +28,10 @@ const generalLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
+  max: config.isDev ? 200 : 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS',
   message: {
     success: false,
     message: 'Too many authentication attempts from this IP, please try again after 15 minutes.',

@@ -15,6 +15,8 @@ const REPORT_CATEGORIES = [
   'UNSAFE_FOOD', 'SPOILED_OR_EXPIRED', 'WRONG_ALLERGEN_INFO',
   'WRONG_DESCRIPTION', 'COLD_CHAIN_CONCERN', 'ALREADY_GONE',
   'DONOR_MISCONDUCT', 'OTHER',
+  // Common client aliases
+  'SAFETY_CONCERN', 'INCORRECT_INFO', 'ALREADY_CLAIMED', 'SPAM',
 ];
 
 const submitReportSchema = Joi.object({
@@ -26,6 +28,7 @@ const submitReportSchema = Joi.object({
 const resolveReportSchema = Joi.object({
   status:           Joi.string().valid('RESOLVED', 'DISMISSED').required(),
   resolution_notes: Joi.string().max(1000).optional(),
+  notes:            Joi.string().max(1000).optional(),
   restore_donation: Joi.boolean().default(false),
 });
 
@@ -40,7 +43,7 @@ const listReportsQuerySchema = Joi.object({
 
 /**
  * POST /api/v1/reports
- * Public — no authentication required.
+ * Public no authentication required.
  */
 async function submitReport(req, res, next) {
   try {
@@ -57,7 +60,7 @@ async function submitReport(req, res, next) {
 
 /**
  * GET /api/v1/reports
- * ADMIN only — enforced in route file.
+ * ADMIN only enforced in route file.
  */
 async function listReports(req, res, next) {
   try {
@@ -70,7 +73,7 @@ async function listReports(req, res, next) {
 
 /**
  * PATCH /api/v1/reports/:id/resolve
- * ADMIN only — enforced in route file.
+ * ADMIN only enforced in route file.
  */
 async function resolveReport(req, res, next) {
   try {
@@ -90,7 +93,7 @@ module.exports = {
   submitReport,
   listReports,
   resolveReport,
-  // Schemas — consumed by route files
+  // Schemas consumed by route files
   submitReportSchema,
   resolveReportSchema,
   listReportsQuerySchema,

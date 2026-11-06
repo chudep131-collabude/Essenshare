@@ -8,7 +8,7 @@
  * Token strategy:
  *  - Access token: kept in module-level memory only (never localStorage/cookie)
  *  - On 401: attempt silent refresh via /auth/refresh, retry original request once
- *  - Refresh token: stored as httpOnly cookie by the backend — never touched here
+ *  - Refresh token: stored as httpOnly cookie by the backend never touched here
  */
 
 const API_BASE =
@@ -19,7 +19,7 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 // ── In-memory access token ────────────────────────────────────────────────────
 
-/** Access token held in module memory — never in localStorage or a cookie. */
+/** Access token held in module memory never in localStorage or a cookie. */
 let _accessToken: string | null = null;
 
 export function setAccessToken(token: string | null): void {
@@ -172,11 +172,11 @@ export async function apiFetch<T>(
     return await rawFetch<T>(path, options, _accessToken);
   } catch (err) {
     if (err instanceof ApiException && err.status === 401) {
-      // Don't retry the refresh endpoint itself — that would loop infinitely
+      // Don't retry the refresh endpoint itself that would loop infinitely
       if (path === '/auth/refresh') throw err;
 
       const newToken = await silentRefresh();
-      if (!newToken) throw err; // refresh failed — caller must redirect to login
+      if (!newToken) throw err; // refresh failed caller must redirect to login
 
       // Retry original request once with the new token
       return rawFetch<T>(path, options, newToken);
@@ -196,6 +196,34 @@ export async function apiPost<T>(
   return apiFetch<T>(path, {
     method: 'POST',
     body: JSON.stringify(body),
+    ...options,
+  });
+}
+
+/**
+ * Convenience helper: PATCH with a JSON body.
+ */
+export async function apiPatch<T>(
+  path: string,
+  body: unknown,
+  options: RequestInit = {}
+): Promise<ApiEnvelope<T>> {
+  return apiFetch<T>(path, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    ...options,
+  });
+}
+
+/**
+ * Convenience helper: DELETE request.
+ */
+export async function apiDelete<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<ApiEnvelope<T>> {
+  return apiFetch<T>(path, {
+    method: 'DELETE',
     ...options,
   });
 }

@@ -9,47 +9,71 @@ interface Slide {
   src: string;
   alt: string;
   eyebrow: string;
+  headline: string;
   subtitle: string;
+  position: string;
 }
 
 const slides: Slide[] = [
   {
-    src: '/web/grocerys.jpg',
-    alt: 'Boxes of packaged grocery surplus items ready for collection',
-    eyebrow: 'Surplus Groceries',
-    subtitle: 'Surplus groceries and everyday essentials — given, not wasted.',
+    src: '/web/joel-muniz-3k3l2brxmwQ-unsplash.jpg',
+    alt: 'Volunteers sorting donated food along a long table at a food bank',
+    eyebrow: 'The food already exists',
+    headline: 'The problem was never scarcity. It was connection.',
+    subtitle:
+      'Every day, enough food is thrown away in a single city to feed everyone in it who is hungry. EssenShare exists to close that gap for free.',
+    position: 'center 35%',
   },
   {
-    src: '/web/hero.jpg',
-    alt: 'Freshly baked bread and pastries at end of day',
-    eyebrow: 'Bakeries & Cafes',
-    subtitle: 'Bakeries and cafes sharing what remains at the end of the day.',
+    src: '/web/compagnons-BVMDDiePqXU-unsplash.jpg',
+    alt: 'Bags of fresh vegetables carrots, kale and squash ready for collection',
+    eyebrow: 'Farm & garden surplus',
+    headline: 'The harvest is in. Not all of it reached the market. It can still reach someone.',
+    subtitle:
+      'Farms, allotments, and producers list what markets cannot take. Families collect directly. The gap closes.',
+    position: 'center 40%',
   },
   {
-    src: '/web/hero.png',
-    alt: 'Crates of farm-fresh produce surplus ready for redistribution',
-    eyebrow: 'Farm Produce',
-    subtitle: 'Fresh farm produce reaching the people who need it most.',
+    src: '/web/about.jpg',
+    alt: 'Volunteers packing meal bags at a community food distribution table',
+    eyebrow: 'Same day. Same neighbourhood.',
+    headline: 'At closing time, the bread is still fresh. Someone nearby needs it.',
+    subtitle:
+      'End-of-day surplus from bakeries, restaurants, and cafés reaches people within the hour not the bin.',
+    position: 'center 30%',
   },
   {
-    src: '/web/more.jpg',
-    alt: 'Community members exchanging a grocery bag at a local handover point',
-    eyebrow: 'Community',
-    subtitle: 'Every pickup is a story. Every handover creates real impact.',
+    src: '/web/pasquale-farro-XOb2dnK8EeM-unsplash.jpg',
+    alt: 'Vendor handing produce to a customer at a farmer\'s market stall',
+    eyebrow: 'Every handover is proof',
+    headline: 'A code. A confirmed handover. One more real number on the board.',
+    subtitle:
+      'Every completed collection is recorded permanently. No estimates. No inflation. Just the truth of what moved from surplus to someone who needed it.',
+    position: 'center 45%',
   },
 ];
 
-const HEADLINE = 'No good food should become waste while someone nearby is hungry.';
-const AUTO_ADVANCE_MS = 5000;
+const AUTO_ADVANCE_MS = 6000;
 
 export default function HeroCarousel() {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+
+  // Refs for GSAP text animations
+  const eyebrowRef = useRef<HTMLParagraphElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
-  const touchStartX = useRef<number | null>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const ctaRef = useRef<HTMLDivElement>(null);
+  const taglineRef = useRef<HTMLParagraphElement>(null);
+
+  // Progress bar animation
+  const progressRef = useRef<HTMLSpanElement[]>([]);
+  const progressTweenRef = useRef<gsap.core.Tween | null>(null);
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasRevealedRef = useRef(false);
+  const touchStartX = useRef<number | null>(null);
+  const isAnimatingRef = useRef(false);
 
   // SSR-safe reduced-motion detection
   useEffect(() => {
@@ -61,69 +85,172 @@ export default function HeroCarousel() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // GSAP headline reveal — fires once on first mount
-  // Uses clipPath + translateY instead of Club-only SplitText
-  useEffect(() => {
-    if (reducedMotion || hasRevealedRef.current || !headlineRef.current) return;
-    hasRevealedRef.current = true;
+  // Text reveal animation runs on every slide change
+  const animateContent = useCallback(() => {
+    if (reducedMotion) return;
+    const targets = [eyebrowRef.current, headlineRef.current, subtitleRef.current, ctaRef.current, taglineRef.current].filter(Boolean);
+    if (!targets.length) return;
 
-    const ctx = gsap.context(() => {
-      gsap.from(headlineRef.current!, {
-        clipPath: 'inset(0 0 100% 0)',
-        y: 32,
-        duration: 1.1,
+    const tl = gsap.timeline();
+
+    // Eyebrow fast fade up
+    tl.fromTo(
+      eyebrowRef.current,
+      { opacity: 0, y: 12 },
+      { opacity: 1, y: 0, duration: 0.45, ease: 'power3.out' },
+      0
+    );
+
+    // Headline clip-path reveal from bottom (signature moment)
+    tl.fromTo(
+      headlineRef.current,
+      { clipPath: 'inset(0 0 100% 0)', y: 20, opacity: 0 },
+      {
+        clipPath: 'inset(0 0 0% 0)',
+        y: 0,
+        opacity: 1,
+        duration: 0.8,
         ease: 'power4.out',
-        delay: 0.3,
-        clearProps: 'clipPath,y',
+        clearProps: 'clipPath,y,opacity',
+      },
+      0.1
+    );
+
+    // Subtitle fade up, slight delay
+    tl.fromTo(
+      subtitleRef.current,
+      { opacity: 0, y: 14 },
+      { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' },
+      0.35
+    );
+
+    // CTAs fade up together
+    tl.fromTo(
+      ctaRef.current,
+      { opacity: 0, y: 10 },
+      { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' },
+      0.5
+    );
+
+    // Tagline last, very subtle
+    tl.fromTo(
+      taglineRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.4, ease: 'none' },
+      0.65
+    );
+  }, [reducedMotion]);
+
+  // Progress bar fills over AUTO_ADVANCE_MS for the active slide
+  const startProgressBar = useCallback(
+    (index: number) => {
+      if (reducedMotion) return;
+      const bar = progressRef.current[index];
+      if (!bar) return;
+
+      // Kill any running tween
+      if (progressTweenRef.current) progressTweenRef.current.kill();
+
+      // Reset all bars
+      progressRef.current.forEach((b, i) => {
+        if (b) gsap.set(b, { scaleX: i === index ? 0 : 0 });
       });
-    }, headlineRef);
 
-    return () => ctx.revert();
-    // intentionally only on mount — reducedMotion guard handles the skip
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      progressTweenRef.current = gsap.fromTo(
+        bar,
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          duration: AUTO_ADVANCE_MS / 1000,
+          ease: 'none',
+          transformOrigin: 'left center',
+          paused: false,
+        }
+      );
+    },
+    [reducedMotion]
+  );
 
-  const goTo = useCallback((index: number) => {
-    setCurrent(((index % slides.length) + slides.length) % slides.length);
-  }, []);
-
-  const next = useCallback(() => goTo(current + 1), [current, goTo]);
-  const prev = useCallback(() => goTo(current - 1), [current, goTo]);
-
-  // Auto-advance — skip if reducedMotion
+  // Pause/resume the progress bar
   useEffect(() => {
-    if (reducedMotion || paused) return;
-    intervalRef.current = setInterval(next, AUTO_ADVANCE_MS);
+    if (!progressTweenRef.current) return;
+    if (paused) {
+      progressTweenRef.current.pause();
+    } else {
+      progressTweenRef.current.resume();
+    }
+  }, [paused]);
+
+  const goTo = useCallback(
+    (index: number) => {
+      if (isAnimatingRef.current) return;
+      isAnimatingRef.current = true;
+      const next = ((index % slides.length) + slides.length) % slides.length;
+      setCurrent(next);
+      setTimeout(() => {
+        isAnimatingRef.current = false;
+      }, 500);
+    },
+    []
+  );
+
+  const advance = useCallback(() => {
+    setCurrent(c => {
+      const next = (c + 1) % slides.length;
+      return next;
+    });
+  }, []);
+
+  // Auto-advance
+  useEffect(() => {
+    if (reducedMotion || paused) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      return;
+    }
+    intervalRef.current = setInterval(advance, AUTO_ADVANCE_MS);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [next, paused, reducedMotion]);
+  }, [advance, paused, reducedMotion]);
 
-  function handleTouchStart(e: React.TouchEvent) {
+  // Run content animation + progress bar whenever slide changes
+  useEffect(() => {
+    animateContent();
+    startProgressBar(current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current]);
+
+  // Initial mount animation
+  useEffect(() => {
+    animateContent();
+    startProgressBar(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
-  }
+  };
 
-  function handleTouchEnd(e: React.TouchEvent) {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     const delta = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(delta) > 40) {
-      if (delta < 0) next();
-      else prev();
+      goTo(delta < 0 ? current + 1 : current - 1);
     }
     touchStartX.current = null;
-  }
+  };
 
   return (
     <section
-      aria-label="Essenshare hero carousel"
+      aria-label="Essenshare hero"
       className="relative overflow-hidden"
-      style={{ height: 'clamp(520px, 88vh, 900px)' }}
+      style={{ height: 'clamp(600px, 92vh, 960px)' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* ── Slides ── */}
+      {/* ── Slides smooth crossfade ── */}
       {slides.map((slide, idx) => (
         <div
           key={slide.src}
@@ -131,7 +258,10 @@ export default function HeroCarousel() {
           className="absolute inset-0"
           style={{
             opacity: idx === current ? 1 : 0,
-            transition: 'opacity 700ms var(--ease-inout)',
+            transition: reducedMotion
+              ? 'none'
+              : 'opacity 1000ms cubic-bezier(0.65, 0.05, 0.36, 1)',
+            zIndex: idx === current ? 2 : 1,
           }}
         >
           <Image
@@ -139,37 +269,51 @@ export default function HeroCarousel() {
             alt={slide.alt}
             fill
             priority={idx === 0}
-            className="object-cover object-center"
+            style={{
+              objectFit: 'cover',
+              objectPosition: slide.position,
+              transform: idx === current ? 'scale(1.0)' : 'scale(1.04)',
+              transition: reducedMotion
+                ? 'none'
+                : 'transform 9000ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
             sizes="100vw"
+            quality={90}
           />
         </div>
       ))}
 
-      {/* ── Dark gradient overlay ── */}
+      {/* ── Gradient overlay stronger at bottom for legibility ── */}
       <div
-        className="absolute inset-0 z-10"
+        className="absolute inset-0"
         aria-hidden="true"
         style={{
+          zIndex: 3,
           background:
-            'linear-gradient(to bottom, oklch(0% 0 0 / 0.08) 0%, oklch(0% 0 0 / 0.45) 40%, oklch(0% 0 0 / 0.72) 100%)',
+            'linear-gradient(to bottom, oklch(0% 0 0 / 0.08) 0%, oklch(0% 0 0 / 0.20) 30%, oklch(0% 0 0 / 0.65) 70%, oklch(0% 0 0 / 0.82) 100%)',
         }}
       />
 
-      {/* ── Content — bottom-third, left-aligned ── */}
+      {/* ── Content ── */}
       <div
-        className="relative z-20 flex flex-col justify-end h-full"
-        style={{ paddingInline: 'var(--space-page)', paddingBlockEnd: 'clamp(3rem, 6vw, 5rem)' }}
+        className="absolute inset-0 flex flex-col justify-end"
+        style={{
+          zIndex: 4,
+          paddingInline: 'var(--space-page)',
+          paddingBlockEnd: 'clamp(3rem, 6vw, 5rem)',
+        }}
       >
-        <div style={{ maxWidth: '48rem' }}>
+        <div style={{ maxWidth: '46rem' }}>
           {/* Eyebrow */}
           <p
+            ref={eyebrowRef}
             aria-live="polite"
             aria-atomic="true"
             style={{
               fontSize: 'var(--step--1)',
-              color: 'oklch(99% 0 0 / 0.70)',
+              color: 'oklch(99% 0 0 / 0.60)',
               textTransform: 'uppercase',
-              letterSpacing: '0.10em',
+              letterSpacing: '0.12em',
               fontWeight: 500,
               marginBlockEnd: 'var(--space-s)',
             }}
@@ -177,33 +321,34 @@ export default function HeroCarousel() {
             {slides[current].eyebrow}
           </p>
 
-          {/* Headline — constant, GSAP reveal target */}
+          {/* Headline */}
           <h1
             ref={headlineRef}
             style={{
               fontSize: 'var(--display)',
               fontWeight: 800,
               color: 'oklch(99% 0 0)',
-              lineHeight: 1.0,
+              lineHeight: 1.02,
               letterSpacing: '-0.03em',
               textWrap: 'balance' as React.CSSProperties['textWrap'],
-              marginBlockEnd: 'var(--space-l)',
+              marginBlockEnd: 'var(--space-m)',
+              willChange: 'clip-path, transform, opacity',
             }}
           >
-            {HEADLINE}
+            {slides[current].headline}
           </h1>
 
           {/* Subtitle */}
           <p
+            ref={subtitleRef}
             aria-live="polite"
             aria-atomic="true"
             style={{
-              fontSize: 'var(--step-1)',
-              color: 'oklch(99% 0 0 / 0.80)',
+              fontSize: 'var(--step-0)',
+              color: 'oklch(99% 0 0 / 0.78)',
               maxWidth: '36rem',
-              lineHeight: 1.55,
+              lineHeight: 1.65,
               marginBlockEnd: 'var(--space-xl)',
-              transition: 'opacity 500ms var(--ease-out)',
             }}
           >
             {slides[current].subtitle}
@@ -211,11 +356,8 @@ export default function HeroCarousel() {
 
           {/* CTAs */}
           <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 'var(--space-s)',
-            }}
+            ref={ctaRef}
+            style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-s)' }}
           >
             <Link
               href="/find"
@@ -228,11 +370,10 @@ export default function HeroCarousel() {
                 borderRadius: 'var(--radius-pill)',
                 background: 'var(--accent)',
                 color: 'var(--accent-on)',
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: 'var(--step-0)',
                 minHeight: '44px',
                 textDecoration: 'none',
-                border: '2px solid transparent',
                 transition: 'background var(--dur-fast) var(--ease-out)',
               }}
             >
@@ -249,109 +390,42 @@ export default function HeroCarousel() {
                 borderRadius: 'var(--radius-pill)',
                 background: 'transparent',
                 color: 'oklch(99% 0 0)',
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: 'var(--step-0)',
                 minHeight: '44px',
                 textDecoration: 'none',
-                border: '2px solid oklch(99% 0 0 / 0.70)',
-                transition: 'background var(--dur-fast) var(--ease-out), border-color var(--dur-fast)',
+                border: '1.5px solid oklch(99% 0 0 / 0.50)',
+                transition: 'border-color var(--dur-fast), background var(--dur-fast)',
               }}
             >
-              Become a Donor
+              List a Donation
             </Link>
           </div>
+
+          <p
+            ref={taglineRef}
+            style={{
+              marginBlockStart: 'var(--space-m)',
+              fontSize: 'var(--step--1)',
+              color: 'oklch(99% 0 0 / 0.45)',
+            }}
+          >
+            No account needed to find or collect food.
+          </p>
         </div>
       </div>
 
-      {/* ── Previous arrow — hidden on mobile ── */}
-      <button
-        type="button"
-        onClick={prev}
-        aria-label="Previous slide"
-        className="hidden sm:flex"
-        style={{
-          position: 'absolute',
-          insetBlockStart: '50%',
-          insetInlineStart: 'var(--space-l)',
-          transform: 'translateY(-50%)',
-          zIndex: 30,
-          width: '44px',
-          height: '44px',
-          borderRadius: '50%',
-          border: '1.5px solid oklch(99% 0 0 / 0.40)',
-          background: 'oklch(0% 0 0 / 0.25)',
-          color: 'oklch(99% 0 0)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'background var(--dur-fast)',
-        }}
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-
-      {/* ── Next arrow — hidden on mobile ── */}
-      <button
-        type="button"
-        onClick={next}
-        aria-label="Next slide"
-        className="hidden sm:flex"
-        style={{
-          position: 'absolute',
-          insetBlockStart: '50%',
-          insetInlineEnd: 'var(--space-l)',
-          transform: 'translateY(-50%)',
-          zIndex: 30,
-          width: '44px',
-          height: '44px',
-          borderRadius: '50%',
-          border: '1.5px solid oklch(99% 0 0 / 0.40)',
-          background: 'oklch(0% 0 0 / 0.25)',
-          color: 'oklch(99% 0 0)',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          transition: 'background var(--dur-fast)',
-        }}
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-
-      {/* ── Dot indicators — bottom-end ── */}
+      {/* ── Progress bar indicators (replaces arrows + dots) ── */}
       <div
         role="tablist"
-        aria-label="Carousel slide indicators"
+        aria-label="Carousel slides"
         style={{
           position: 'absolute',
           insetBlockEnd: 'var(--space-l)',
-          insetInlineEnd: 'var(--space-l)',
-          zIndex: 30,
+          insetInlineEnd: 'var(--space-page)',
+          zIndex: 5,
           display: 'flex',
-          gap: 'var(--space-xs)',
+          gap: '6px',
           alignItems: 'center',
         }}
       >
@@ -362,25 +436,68 @@ export default function HeroCarousel() {
             role="tab"
             aria-selected={idx === current}
             aria-label={`Slide ${idx + 1}: ${slide.eyebrow}`}
-            onClick={() => goTo(idx)}
+            onClick={() => {
+              goTo(idx);
+              setPaused(false);
+              // Reset interval
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              if (!reducedMotion) {
+                intervalRef.current = setInterval(advance, AUTO_ADVANCE_MS);
+              }
+            }}
             style={{
-              width: idx === current ? '24px' : '8px',
-              height: '8px',
-              borderRadius: 'var(--radius-pill)',
+              position: 'relative',
+              width: idx === current ? '64px' : '28px',
+              height: '3px',
+              borderRadius: '2px',
               border: 'none',
-              background:
-                idx === current ? 'oklch(99% 0 0)' : 'oklch(99% 0 0 / 0.45)',
+              background: 'oklch(99% 0 0 / 0.28)',
               cursor: 'pointer',
               padding: 0,
-              transition: 'width 300ms var(--ease-out), background 200ms',
-              minWidth: '8px',
-              // Ensure 44px touch target via padding
-              paddingBlock: '18px',
-              marginBlock: '-18px',
+              // Extend tap target without changing visual
+              paddingBlock: '14px',
+              marginBlock: '-14px',
+              overflow: 'hidden',
+              transition: 'width 300ms var(--ease-out)',
             }}
-          />
+          >
+            {/* Progress fill */}
+            <span
+              ref={(el) => {
+                if (el) progressRef.current[idx] = el;
+              }}
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'oklch(99% 0 0)',
+                borderRadius: '2px',
+                transformOrigin: 'left center',
+                transform: 'scaleX(0)',
+                // Instant full fill for already-passed slides
+                ...(idx < current ? { transform: 'scaleX(1)' } : {}),
+              }}
+            />
+          </button>
         ))}
       </div>
+
+      {/* ── Slide counter ── */}
+      <p
+        aria-live="polite"
+        style={{
+          position: 'absolute',
+          insetBlockEnd: 'var(--space-l)',
+          insetInlineStart: 'var(--space-page)',
+          zIndex: 5,
+          fontSize: 'var(--step--1)',
+          color: 'oklch(99% 0 0 / 0.45)',
+          fontVariantNumeric: 'tabular-nums',
+          letterSpacing: '0.06em',
+        }}
+      >
+        {String(current + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
+      </p>
     </section>
   );
 }

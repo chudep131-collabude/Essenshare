@@ -9,29 +9,44 @@
  * On success redirects to /login with a confirmation message via query param.
  */
 
-import { useState, useRef, useEffect, FormEvent } from 'react';
+import { useState, useRef, useEffect, FormEvent, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Alert from '@/components/ui/Alert';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import PasswordStrengthInput from '@/components/ui/PasswordStrengthInput';
 import { apiPost, ApiException } from '@/lib/api';
+import { validatePasswordStrength } from '@/lib/password';
 
 const inputClass =
   'w-full px-4 py-2.5 rounded-md border text-sm text-ink placeholder:text-ink-quiet bg-surface focus:outline-none focus:ring-2 focus:border-accent transition-colors';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
+  const searchParams = useSearchParams();
+  const urlDevOtp = searchParams.get('dev_otp') ?? '';
+
+  const [devCode, setDevCode] = useState<string | null>(null);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
+    let code = urlDevOtp;
+    if (!code && typeof window !== 'undefined') {
+      code = sessionStorage.getItem('dev_reset_otp') || '';
+    }
+    if (code && code.length === 6) {
+      setDevCode(code);
+      setOtp(code.split(''));
+    }
     inputRefs.current[0]?.focus();
-  }, []);
+  }, [urlDevOtp]);
 
   const otpValue = otp.join('');
   const isOtpComplete = otpValue.length === 6;
@@ -72,8 +87,9 @@ export default function ResetPasswordPage() {
       setError('Please enter the full 6-digit code.');
       return;
     }
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+    const passwordError = validatePasswordStrength(newPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -164,6 +180,31 @@ export default function ResetPasswordPage() {
             </Alert>
           )}
 
+          {/* Local testing banner */}
+          {devCode && (
+            <div className="mb-6 p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5 font-semibold text-emerald-800 dark:text-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Local Testing Mode
+                </div>
+                <p className="text-ink-muted text-xs">
+                  Your reset code: <strong className="font-mono text-ink text-sm tracking-widest">{devCode}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOtp(devCode.split(''));
+                  inputRefs.current[5]?.focus();
+                }}
+                className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shrink-0"
+              >
+                Auto-fill Code
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {/* OTP inputs */}
             <fieldset>
@@ -205,30 +246,38 @@ export default function ResetPasswordPage() {
             </fieldset>
 
             {/* New password */}
+            <PasswordStrengthInput
+              id="new-password"
+              label="New password"
+              required
+              value={newPassword}
+              onChange={(v) => { setNewPassword(v); setError(null); }}
+              autoComplete="new-password"
+            />
+
+            {/* Confirm password */}
             <div>
-              <label htmlFor="new-password" className="block text-sm font-medium text-ink mb-1">
-                New password
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-ink mb-1">
+                Confirm new password <span className="text-error" aria-label="required">*</span>
               </label>
               <div className="relative">
                 <input
-                  id="new-password"
-                  type={showPassword ? 'text' : 'password'}
+                  id="confirm-password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   autoComplete="new-password"
                   required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => { setNewPassword(e.target.value); setError(null); }}
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }}
                   className={inputClass}
                   style={{ borderColor: 'var(--line)', paddingRight: '2.75rem' }}
-                  aria-describedby="new-password-hint"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-3 flex items-center text-ink-muted hover:text-ink"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  className="absolute inset-y-0 right-3 flex items-center text-ink-muted hover:text-ink cursor-pointer focus:outline-none"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                 >
-                  {showPassword ? (
+                  {showConfirmPassword ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
                       stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
@@ -244,26 +293,6 @@ export default function ResetPasswordPage() {
                   )}
                 </button>
               </div>
-              <p id="new-password-hint" className="mt-1 text-xs text-ink-muted">
-                Minimum 8 characters
-              </p>
-            </div>
-
-            {/* Confirm password */}
-            <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-ink mb-1">
-                Confirm new password
-              </label>
-              <input
-                id="confirm-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                required
-                value={confirmPassword}
-                onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }}
-                className={inputClass}
-                style={{ borderColor: 'var(--line)' }}
-              />
             </div>
 
             <button
@@ -291,5 +320,19 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[70vh] flex items-center justify-center">
+          <LoadingSpinner size="md" />
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

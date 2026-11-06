@@ -27,10 +27,10 @@ graph LR
 2. Log in to [Render](https://dashboard.render.com/).
 3. Click **Blueprints** → **New Blueprint Instance**.
 4. Select your repository. Render will automatically read [`render.yaml`](../render.yaml) and create:
-   - **`essenshare-db`**: Managed PostgreSQL database.
    - **`essenshare-api`**: Web service running `backend/` with auto-migrations.
 5. In the blueprint review:
-   - Fill in `APP_URL` with your frontend URL (e.g., `https://essenshare.vercel.app`).
+   - Fill in `DATABASE_URL` with your existing database connection string (e.g. Neon).
+   - Fill in `APP_URL` and `CORS_ORIGIN` with your frontend URL (e.g. `https://essenshare.vercel.app`).
    - Click **Apply**.
 
 ### Method B: Manual Web Service Setup
